@@ -1,0 +1,22 @@
+# Project Specific
+node_modules/
+target/
+*.log
+.env
+debug.log
+
+# Python
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+*.pyc
+
+# IDEs and OS
+.idea/
+.vscode/
+.DS_Store
+.cursor/
+src/.cursor/

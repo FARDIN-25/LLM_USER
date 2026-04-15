@@ -1,0 +1,2796 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="app-user-name" content="{{ (user_name or 'User') | e }}">
+    <title>Tax Assistant - AI Chat</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            background: #343541;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .header {
+            background: #202123;
+            padding: 12px 20px;
+            border-bottom: 1px solid #4d4d4f;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+            z-index: 100;
+        }
+
+        .header h1 {
+            font-size: 1.2em;
+            font-weight: 600;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .btn-header {
+            background: transparent;
+            border: 1px solid #565869;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: background 0.2s;
+        }
+
+        .btn-header:hover {
+            background: #40414f;
+        }
+
+        /* ================================
+           Temporary Chat Toggle Switch
+        ================================ */
+
+        .toggle-wrapper {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .toggle-switch {
+            width: 46px;
+            height: 24px;
+            background: #565869;
+            border-radius: 20px;
+            position: relative;
+            transition: background 0.25s ease;
+        }
+
+        .toggle-circle {
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.25s ease;
+        }
+
+        .toggle-switch.active {
+            background: #19c37d;
+        }
+
+        .toggle-switch.active .toggle-circle {
+            transform: translateX(22px);
+        }
+
+        /* Disabled state for temporary chat toggle once chat has started */
+        .toggle-wrapper.toggle-disabled {
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        /* Main Chat Container */
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: #343541;
+        }
+
+        /* Messages Area */
+        .messages-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .messages-area::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .messages-area::-webkit-scrollbar-track {
+            background: #343541;
+        }
+
+        .messages-area::-webkit-scrollbar-thumb {
+            background: #565869;
+            border-radius: 4px;
+        }
+
+        /* Category filter panel (history by topic) */
+        .category-filter-panel {
+            padding: 8px 16px 4px 16px;
+            border-top: 1px solid #444654;
+            border-bottom: 1px solid #444654;
+            background: #343541;
+        }
+
+        .category-filter-panel h3 {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #9ca3af;
+            margin-bottom: 6px;
+        }
+
+        .category-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+
+        .category-buttons button {
+            padding: 3px 10px;
+            border-radius: 999px;
+            border: 1px solid #4b5563;
+            background: #1f2933;
+            color: #e5e7eb;
+            font-size: 0.75rem;
+            cursor: pointer;
+        }
+
+        .category-buttons button:hover {
+            background: #374151;
+        }
+
+        .category-results {
+            max-height: 180px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .category-results-item {
+            padding: 6px 8px;
+            margin-bottom: 4px;
+            border-radius: 6px;
+            background: #2b2938;
+        }
+
+        .category-results-item .question {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: #e5e7eb;
+            margin-bottom: 2px;
+        }
+
+        .category-results-item .answer {
+            font-size: 0.75rem;
+            color: #d1d5db;
+        }
+
+        .category-results-item .meta {
+            font-size: 0.7rem;
+            color: #9ca3af;
+            margin-top: 2px;
+        }
+
+        /* Message Bubbles - 70% window width for readable display size */
+        .message {
+            display: flex;
+            gap: 15px;
+            max-width: 70%;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .message.user {
+            flex-direction: row-reverse;
+        }
+
+        .message-content {
+            flex: 1;
+            padding: 12px 16px;
+            border-radius: 8px;
+            line-height: 1.6;
+            word-wrap: break-word;
+        }
+
+        .message.user .message-content {
+            background: #333333;
+            color: white;
+        }
+
+        .message.assistant .message-content {
+            background: #444654;
+            color: #ececf1;
+        }
+
+        /* Category badge for user questions */
+        .category-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            margin-right: 6px;
+            margin-bottom: 4px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: #ffffff;
+        }
+
+        .category-gst {
+            background-color: #16a34a;
+            /* Green */
+        }
+
+        .category-income_tax {
+            background-color: #2563eb;
+            /* Blue */
+        }
+
+        .category-tds {
+            background-color: #f97316;
+            /* Orange */
+        }
+
+        .category-roc {
+            background-color: #7e22ce;
+            /* Purple */
+        }
+
+        .category-general {
+            background-color: #6b7280;
+            /* Gray */
+        }
+
+        .message-content pre {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+
+        .message-content code {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .message-content ul,
+        .message-content ol {
+            margin: 10px 0 10px 20px;
+        }
+
+        .message-content li {
+            margin: 5px 0;
+        }
+
+        .message-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+
+        .message-content th,
+        .message-content td {
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 8px;
+            text-align: left;
+        }
+
+        .message-content th {
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .message-files {
+            margin-top: 8px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .file-tag {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* Fintax-style message controls: edit, copy, regenerate (small icons on hover) */
+        .message-controls {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            margin-left: 8px;
+            opacity: 0;
+            transition: opacity 0.2s;
+            vertical-align: middle;
+        }
+
+        .message:hover .message-controls,
+        .message:focus-within .message-controls {
+            opacity: 1;
+        }
+
+        .message-controls .btn-msg {
+            background: transparent;
+            border: none;
+            color: #8e8ea0;
+            cursor: pointer;
+            padding: 4px 6px;
+            border-radius: 4px;
+            font-size: 14px;
+            line-height: 1;
+            transition: background 0.2s, color 0.2s;
+        }
+
+        .message-controls .btn-msg:hover {
+            background: #565869;
+            color: #ececf1;
+        }
+
+        .message-edited-label {
+            font-size: 0.75em;
+            color: #8e8ea0;
+            margin-left: 6px;
+            font-style: italic;
+        }
+
+        .message-content-wrap {
+            display: flex;
+            align-items: flex-start;
+            flex-wrap: wrap;
+        }
+
+        .message-content-wrap .message-body {
+            flex: 1;
+            min-width: 0;
+        }
+
+        /* Inline edit: textarea + Save/Cancel */
+        .inline-edit-wrap {
+            width: 100%;
+        }
+
+        .inline-edit-wrap textarea {
+            width: 100%;
+            min-height: 80px;
+            padding: 10px 12px;
+            background: #40414f;
+            border: 1px solid #565869;
+            border-radius: 8px;
+            color: #ececf1;
+            font-size: 15px;
+            font-family: inherit;
+            resize: vertical;
+            margin-bottom: 8px;
+        }
+
+        .inline-edit-wrap textarea:focus {
+            outline: none;
+            border-color: #19c37d;
+        }
+
+        .inline-edit-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .inline-edit-actions button {
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 0.9em;
+            cursor: pointer;
+            border: none;
+        }
+
+        .inline-edit-actions .btn-save-edit {
+            background: #19c37d;
+            color: white;
+        }
+
+        .inline-edit-actions .btn-save-edit:hover {
+            background: #16a570;
+        }
+
+        .inline-edit-actions .btn-cancel-edit {
+            background: #565869;
+            color: #ececf1;
+        }
+
+        .inline-edit-actions .btn-cancel-edit:hover {
+            background: #40414f;
+        }
+
+        /* Message actions: single emoji reaction */
+        .message-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .message.assistant .message-actions {
+            justify-content: flex-start;
+        }
+
+        /* Emoji reaction (one per message) */
+        .reactions-container {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+        }
+
+        .reaction-emoji {
+            font-size: 16px;
+        }
+
+        .reaction-emoji.active {
+            background: rgba(25, 195, 125, 0.2);
+            border: 1px solid #19c37d;
+            border-radius: 12px;
+            padding: 2px 8px;
+            display: inline-block;
+        }
+
+        .add-reaction-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 16px;
+            padding: 4px 10px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #8e8ea0;
+            transition: all 0.2s;
+        }
+
+        .add-reaction-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            color: #ececf1;
+        }
+
+        .emoji-picker {
+            display: none;
+            position: absolute;
+            background: #40414f;
+            border: 1px solid #565869;
+            border-radius: 8px;
+            padding: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            margin-top: 4px;
+        }
+
+        .emoji-picker.show {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 4px;
+        }
+
+        .emoji-option {
+            background: transparent;
+            border: none;
+            font-size: 20px;
+            padding: 8px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        .emoji-option:hover {
+            background: #565869;
+        }
+
+        /* Input Area */
+        .input-area {
+            background: #40414f;
+            padding: 15px 20px;
+            border-top: 1px solid #565869;
+        }
+
+        .input-container {
+            max-width: 800px;
+            margin: 0 auto;
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }
+
+        .input-wrapper {
+            flex: 1;
+            position: relative;
+            background: #40414f;
+            border: 1px solid #565869;
+            border-radius: 12px;
+            padding: 12px 50px 12px 15px;
+            min-height: 52px;
+            display: flex;
+            align-items: center;
+        }
+
+        .input-wrapper:focus-within {
+            border-color: #19c37d;
+        }
+
+        #chatInput {
+            width: 100%;
+            background: transparent;
+            border: none;
+            color: white;
+            font-size: 16px;
+            resize: none;
+            outline: none;
+            font-family: inherit;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        #chatInput::placeholder {
+            color: #8e8ea0;
+        }
+
+        .input-actions {
+            position: absolute;
+            right: 10px;
+            bottom: 10px;
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-icon {
+            background: transparent;
+            border: none;
+            color: #8e8ea0;
+            cursor: pointer;
+            padding: 6px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s, color 0.2s;
+        }
+
+        .btn-icon:hover {
+            background: #565869;
+            color: white;
+        }
+
+        .btn-send {
+            background: #19c37d;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.2s;
+            min-width: 80px;
+        }
+
+        .btn-send:hover:not(:disabled) {
+            background: #16a570;
+        }
+
+        .btn-send:disabled {
+            background: #565869;
+            cursor: not-allowed;
+        }
+
+        /* Thinking indicator (Fintax-style): text-based, no dots. Fade-in + pulse + border glow + text fade wave. */
+        .message.thinking-indicator {
+            animation: thinking-fade-in 0.35s ease-out forwards;
+        }
+
+        .message.thinking-indicator .message-content {
+            border-left: 3px solid rgba(25, 195, 125, 0.35);
+            animation: thinking-pulse-glow 2s ease-in-out 0.4s infinite, thinking-border-glow 2.5s ease-in-out 0.4s infinite;
+        }
+
+        .thinking-text {
+            color: #9ca3af;
+            font-size: 0.95em;
+            animation: thinking-fade-wave 2.2s ease-in-out 0.4s infinite;
+        }
+
+        @keyframes thinking-fade-in {
+            from {
+                opacity: 0;
+                transform: translateY(4px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes thinking-pulse-glow {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.88;
+            }
+        }
+
+        @keyframes thinking-fade-wave {
+
+            0%,
+            100% {
+                opacity: 0.9;
+            }
+
+            50% {
+                opacity: 1;
+            }
+        }
+
+        @keyframes thinking-border-glow {
+
+            0%,
+            100% {
+                border-left-color: rgba(25, 195, 125, 0.35);
+            }
+
+            50% {
+                border-left-color: rgba(25, 195, 125, 0.65);
+            }
+        }
+
+        /* File Upload */
+        #fileInput {
+            display: none;
+        }
+
+        .file-preview {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 10px;
+            padding: 10px;
+            background: #343541;
+            border-radius: 8px;
+        }
+
+        .file-preview-item {
+            background: #565869;
+            padding: 6px 12px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9em;
+            color: white;
+        }
+
+        .file-preview-item .remove {
+            cursor: pointer;
+            color: #ff6b6b;
+            font-weight: bold;
+        }
+
+        /* Status Bar */
+        .status-bar {
+            background: #202123;
+            padding: 8px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85em;
+            color: #8e8ea0;
+            border-top: 1px solid #4d4d4f;
+        }
+
+        .status-items {
+            display: flex;
+            gap: 20px;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #565869;
+        }
+
+        .status-indicator.healthy {
+            background: #19c37d;
+        }
+
+        .status-indicator.degraded {
+            background: #ffb347;
+        }
+
+        .status-indicator.unavailable {
+            background: #ff6b6b;
+        }
+
+        /* Welcome Screen */
+        .welcome-screen {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: #8e8ea0;
+            padding: 40px;
+        }
+
+        .welcome-screen h2 {
+            font-size: 2em;
+            color: white;
+            margin-bottom: 10px;
+        }
+
+        .welcome-screen p {
+            font-size: 1.1em;
+            margin-bottom: 30px;
+        }
+
+        .example-questions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            max-width: 70%;
+            width: 100%;
+            margin-top: 20px;
+        }
+
+        .example-question {
+            background: #40414f;
+            padding: 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+            text-align: left;
+            border: 1px solid transparent;
+        }
+
+        .example-question:hover {
+            background: #565869;
+            border-color: #19c37d;
+        }
+
+        /* Sidebar - Fintax-style history */
+        .app-layout {
+            display: flex;
+            flex: 1;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 260px;
+            min-width: 260px;
+            background: #202123;
+            border-right: 1px solid #4d4d4f;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: width 0.25s ease, min-width 0.25s ease, transform 0.25s ease;
+        }
+
+        /* Desktop: when closed, collapse sidebar smoothly */
+        .sidebar.closed {
+            width: 0;
+            min-width: 0;
+            border-right-width: 0;
+            overflow: hidden;
+        }
+
+        /* Overlay for mobile: click outside sidebar to close (Fintax-style) */
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 199;
+            opacity: 0;
+            transition: opacity 0.25s ease;
+        }
+
+        .sidebar-overlay.visible {
+            display: block;
+            opacity: 1;
+        }
+
+        .sidebar-header {
+            padding: 12px;
+            border-bottom: 1px solid #4d4d4f;
+        }
+
+        .sidebar-search-input {
+            width: 100%;
+            box-sizing: border-box;
+            margin-top: 8px;
+            padding: 8px 10px;
+            border: 1px solid #565869;
+            border-radius: 6px;
+            background: #40414f;
+            color: #ececf1;
+            font-size: 0.9em;
+        }
+
+        .sidebar-search-input::placeholder {
+            color: #8e8ea0;
+        }
+
+        .sidebar-search-input:focus {
+            outline: none;
+            border-color: #19c37d;
+        }
+
+        .sidebar-search-suggestions {
+            margin-top: 8px;
+            max-height: 280px;
+            overflow-y: auto;
+            border-radius: 6px;
+            background: #40414f;
+            border: 1px solid #565869;
+        }
+
+        .sidebar-search-suggestion-item {
+            padding: 10px 12px;
+            cursor: pointer;
+            color: #ececf1;
+            font-size: 0.9em;
+            border-bottom: 1px solid #4d4d4f;
+            transition: background 0.15s;
+        }
+
+        .sidebar-search-suggestion-item:last-child {
+            border-bottom: none;
+        }
+
+        .sidebar-search-suggestion-item:hover {
+            background: #565869;
+        }
+
+        .sidebar-search-suggestion-title {
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .sidebar-search-suggestion-preview {
+            font-size: 0.85em;
+            color: #8e8ea0;
+            margin-top: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .sidebar-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+            list-style: none;
+        }
+
+        .sidebar-item {
+            padding: 10px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            color: #ececf1;
+            margin-bottom: 4px;
+            font-size: 0.9em;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            min-height: 36px;
+        }
+
+        .sidebar-item-title {
+            flex: 1;
+            min-width: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .sidebar-item-menu {
+            flex-shrink: 0;
+            position: relative;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .sidebar-item:hover .sidebar-item-menu,
+        .sidebar-item:focus-within .sidebar-item-menu,
+        .sidebar-item.sidebar-item-menu-open .sidebar-item-menu {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .sidebar-item-menu-btn {
+            background: transparent;
+            border: none;
+            color: #8e8ea0;
+            cursor: pointer;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 16px;
+            line-height: 1;
+            opacity: 0.7;
+        }
+
+        .sidebar-item-menu-btn:hover {
+            color: #ececf1;
+            background: #565869;
+            opacity: 1;
+        }
+
+        .sidebar-item-menu-btn svg {
+            display: block;
+            width: 18px;
+            height: 18px;
+            fill: currentColor;
+        }
+
+        .sidebar-item-dropdown {
+            display: none;
+            position: absolute;
+            right: 0;
+            top: 100%;
+            margin-top: 2px;
+            background: #40414f;
+            border: 1px solid #565869;
+            border-radius: 6px;
+            padding: 4px 0;
+            min-width: 110px;
+            z-index: 100;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .sidebar-item-dropdown.show {
+            display: block;
+        }
+
+        .sidebar-item-dropdown-option {
+            padding: 8px 14px;
+            cursor: pointer;
+            color: #ececf1;
+            font-size: 0.9em;
+            white-space: nowrap;
+        }
+
+        .sidebar-item-dropdown-option:hover {
+            background: #565869;
+        }
+
+        .sidebar-item-dropdown-option.delete:hover {
+            color: #ff4d4d;
+        }
+
+        .sidebar-item-rename-input {
+            flex: 1;
+            min-width: 0;
+            background: #40414f;
+            border: 1px solid #565869;
+            color: #ececf1;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        .sidebar-item-rename-input:focus {
+            outline: none;
+            border-color: #19c37d;
+        }
+
+        .sidebar-item-save {
+            flex-shrink: 0;
+            background: #19c37d;
+            color: white;
+            border: none;
+            padding: 4px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8em;
+        }
+
+        .sidebar-item-save:hover {
+            background: #16a570;
+        }
+
+        .sidebar-item:hover {
+            background: #40414f;
+        }
+
+        .sidebar-item.active {
+            background: #40414f;
+        }
+
+        .sidebar-empty {
+            color: #8e8ea0;
+            font-size: 0.85em;
+            padding: 12px;
+            text-align: center;
+        }
+
+        .sidebar-toggle {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #34373c;
+            border: 1px solid #565869;
+            color: #ececf1;
+            padding: 8px 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-left: 8px;
+            transition: background 0.2s ease, border-color 0.2s ease;
+        }
+
+        .sidebar-toggle:hover {
+            background: #40414f;
+            border-color: #6e6e80;
+        }
+
+        .sidebar-toggle svg {
+            display: block;
+            width: 20px;
+            height: 20px;
+            fill: currentColor;
+        }
+
+        /* Responsive: mobile sidebar slides in from left, overlay for click-outside */
+        @media (max-width: 768px) {
+            .message {
+                max-width: 100%;
+            }
+
+            .input-container {
+                flex-direction: column;
+            }
+
+            .btn-send {
+                width: 100%;
+            }
+
+            .status-bar {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .sidebar {
+                position: fixed;
+                left: 0;
+                top: 0;
+                bottom: 0;
+                z-index: 200;
+                width: 260px !important;
+                min-width: 260px !important;
+                transform: translateX(-100%);
+                transition: transform 0.25s ease;
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .sidebar.closed {
+                transform: translateX(-100%);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Header -->
+    <div class="header">
+        <button type="button" class="sidebar-toggle" onclick="toggleSidebar()" title="Chat history"
+            aria-label="Toggle chat history sidebar">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z" fill="currentColor" />
+            </svg>
+        </button>
+        <h1>🧾 Robot-Tax-Assistant</h1>
+        <div class="header-actions">
+            <button class="btn-header" onclick="newChat()">➕ New Chat</button>
+            <a href="/history" class="btn-header" style="text-decoration: none;">📜 History</a>
+            <a href="/monitor" target="_blank" class="btn-header" style="text-decoration: none;">📊 Monitor</a>
+            <!-- Temporary Chat Toggle -->
+            <div class="toggle-wrapper" id="tempToggleWrapper" title="Turn on temporary chat">
+                <div class="toggle-switch" id="tempToggle">
+                    <div class="toggle-circle"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="app-layout">
+        <!-- History Sidebar: open/closed state via .open / .closed; toggle with hamburger -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <span style="color: #8e8ea0; font-size: 0.85em;">Chat history</span>
+                <input type="text" id="historySearchInput" class="sidebar-search-input" placeholder="Search chats..."
+                    autocomplete="off"
+                    oninput="if ((this.value||'').trim()==='') { doHistorySearch(); } else { runHistorySearch(); }" />
+                <div id="historySearchSuggestions" class="sidebar-search-suggestions" style="display: none;"></div>
+            </div>
+            <ul class="sidebar-list" id="sidebarSessions">
+                <li class="sidebar-empty">Loading…</li>
+            </ul>
+        </aside>
+        <!-- Overlay (mobile): visible when sidebar open; click to close -->
+        <div class="sidebar-overlay" id="sidebarOverlay" onclick="setSidebarOpen(false)" aria-hidden="true"></div>
+
+        <!-- Main Chat Container -->
+        <div class="chat-container">
+            <!-- Messages Area -->
+            <div class="messages-area" id="messagesArea">
+                <!-- Welcome screen shown when no messages -->
+                <div class="welcome-screen" id="welcomeScreen">
+                    <h2 id="welcomeTitle">Hi {{ user_name }} 👋</h2>
+                    <p id="welcomeSubtitle">💼 What would you like help with today?</p>
+                    <div class="example-questions">
+                        <div class="example-question" onclick="askQuestion('What is GST?')">
+                            💡 What is GST?
+                        </div>
+                        <div class="example-question" onclick="askQuestion('How to file GST returns?')">
+                            📋 How to file GST returns?
+                        </div>
+                        <div class="example-question"
+                            onclick="askQuestion('Difference between Old and New Tax Regime')">
+                            💰 Difference between Old and New Tax Regime
+                        </div>
+                        <div class="example-question" onclick="askQuestion('What are the GST rates in India?')">
+                            📊 What are the GST rates in India?
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Category Filter Panel (read-only history by topic; does not affect current chat) -->
+            <div class="category-filter-panel">
+                <h3>Browse past questions by category</h3>
+                <div class="category-buttons">
+                    <button type="button" onclick="filterCategory('ALL')">All</button>
+                    <button type="button" onclick="filterCategory('GST')">GST</button>
+                    <button type="button" onclick="filterCategory('INCOME_TAX')">Income Tax</button>
+                    <button type="button" onclick="filterCategory('TDS')">TDS</button>
+                    <button type="button" onclick="filterCategory('ROC')">ROC</button>
+                </div>
+                <div id="categoryResults" class="category-results">
+                    <!-- Filtered Q&A items will be rendered here -->
+                </div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="input-area">
+                <div id="filePreview" class="file-preview" style="display: none;"></div>
+                <div class="input-container">
+                    <div class="input-wrapper">
+                        <textarea id="chatInput" placeholder="Ask any GST or tax-related question..."
+                            rows="1"></textarea>
+                        <div class="input-actions">
+                            <button class="btn-icon" onclick="document.getElementById('fileInput').click()"
+                                title="Upload File">
+                                📎
+                            </button>
+                            <input type="file" id="fileInput" multiple accept=".pdf,.txt,.docx,.csv,.xlsx,.xls,.md">
+                        </div>
+                    </div>
+                    <button class="btn-send" id="sendBtn" onclick="sendMessage()">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="status-bar">
+        <div class="status-items">
+            <div class="status-item">
+                <span class="status-indicator" id="dbStatus"></span>
+                <span>Database</span>
+            </div>
+            <div class="status-item">
+                <span class="status-indicator" id="llmStatus"></span>
+                <span>LLM API</span>
+            </div>
+            <div class="status-item">
+                <span class="status-indicator" id="expansionStatus"></span>
+                <span>Query Expansion</span>
+            </div>
+            <div class="status-item">
+                <span class="status-indicator" id="rerankStatus"></span>
+                <span>Reranking</span>
+            </div>
+        </div>
+        <div style="color: #565869;">AI Tax Assistant version 0.1</div>
+    </div>
+
+    <script>
+        let selectedFiles = [];
+
+        // ===============================
+        // Temporary Chat Mode (ChatGPT-style)
+        // ===============================
+        // isTemporaryMode: user chose temporary chat (not stored in history sidebar)
+        let isTemporaryChat = sessionStorage.getItem("temporaryChat") === "true";
+        // isChatStarted: at least one message sent in this view → hide toggle
+        let isChatStarted = false;
+
+        /**
+         * Toggle visibility and state (ChatGPT-style).
+         * - No conversation yet: toggle visible, enabled.
+         * - Temporary chat + conversation started: toggle visible, disabled, tooltip "This chat won't appear in your chat history."
+         * - Normal chat + conversation started: toggle hidden.
+         */
+        function updateToggleVisibility() {
+            const el = document.getElementById("tempToggleWrapper");
+            if (!el) return;
+
+            if (!isChatStarted) {
+                el.style.display = "";
+                el.classList.remove("toggle-disabled");
+                el.title = isTemporaryChat ? "Turn off temporary chat" : "Turn on temporary chat";
+                return;
+            }
+
+            if (isTemporaryChat) {
+                el.style.display = "";
+                el.classList.add("toggle-disabled");
+                el.title = "This chat won't appear in your chat history.";
+            } else {
+                el.style.display = "none";
+                el.classList.remove("toggle-disabled");
+            }
+        }
+
+        // ===============================
+        // Welcome Phrase System
+        // ===============================
+        const normalPhrases = [
+            "How can I assist with your tax query today?",
+            "Welcome! What tax query would you like to resolve?",
+            "Ask me anything about GST, ITR, or taxation.",
+            "Describe your tax issue, and I’ll help you resolve it.",
+            "Need help with GST filings, notices, or tax calculations?"
+        ];
+
+        const tempPhrases = [
+            "Temporary session — ask your tax query.",
+            "Private tax assistance session started. How can I help?",
+            "Temporary chat enabled. Your queries will not be stored.",
+            "Ask your tax question — this conversation will not be saved.",
+            "Temporary chat active — ask your tax query."
+        ];
+
+        const __USER_NAME__ = (
+            document.querySelector('meta[name="app-user-name"]')?.getAttribute("content") ||
+            "User"
+        );
+
+        function setWelcomePhrase() {
+            const titleEl = document.getElementById("welcomeTitle");
+            const subtitleEl = document.getElementById("welcomeSubtitle");
+            if (!titleEl || !subtitleEl) return;
+
+            if (isTemporaryChat) {
+                titleEl.textContent = "Temporary Chat";
+                const randomPhrase = tempPhrases[Math.floor(Math.random() * tempPhrases.length)];
+                subtitleEl.textContent = randomPhrase;
+            } else {
+                titleEl.textContent = `Hi ${__USER_NAME__} 👋`;
+                const randomPhrase = normalPhrases[Math.floor(Math.random() * normalPhrases.length)];
+                subtitleEl.textContent = randomPhrase;
+            }
+        }
+
+        let messageHistory = [];
+        let currentUserId = localStorage.getItem('userId') || 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        // sessionStorage: survives page refresh, clears on tab close (Fintax-style)
+        // active_session for sidebar highlight: currentSessionId; compare with each item's data-session-id
+        let currentSessionId = sessionStorage.getItem('sessionId') || null;
+
+        // Sidebar open/close state (Fintax-style). Persisted in sessionStorage; desktop default open, mobile default closed.
+        let sidebarOpen = (function () {
+            const stored = sessionStorage.getItem('sidebarOpen');
+            if (stored !== null) return stored !== 'false';
+            return window.innerWidth > 768;
+        })();
+
+        // Thinking state: true while waiting for chat API response; used to show thinking bubble
+        let isGenerating = false;
+
+        // Session history: store session_id in frontend state only (no local DB)
+        const SESSIONS_HISTORY_URL = '/api/user/sessions/history';
+        const SESSION_MESSAGES_URL = (sid) => `/api/user/sessions/${encodeURIComponent(sid)}/messages`;
+        const HISTORY_SEARCH_URL = '/api/user/history/search';
+        const UPLOAD_URL = '/api/user/upload';
+
+        /** Debounce helper for history search (300ms). */
+        let historySearchDebounceTimer = null;
+        function debounceHistorySearch(fn, ms) {
+            return function () {
+                if (historySearchDebounceTimer) clearTimeout(historySearchDebounceTimer);
+                historySearchDebounceTimer = setTimeout(fn, ms);
+            };
+        }
+
+        // Save user ID to localStorage if not exists
+        if (!localStorage.getItem('userId')) {
+            localStorage.setItem('userId', currentUserId);
+        }
+
+        /**
+         * Set sidebar open/closed. If sidebarOpen → add "open", else add "closed".
+         * Persists to sessionStorage; updates overlay on mobile (click outside to close).
+         */
+        function setSidebarOpen(open) {
+            sidebarOpen = !!open;
+            sessionStorage.setItem('sidebarOpen', String(sidebarOpen));
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            if (sidebar) {
+                sidebar.classList.toggle('open', sidebarOpen);
+                sidebar.classList.toggle('closed', !sidebarOpen);
+            }
+            if (overlay) overlay.classList.toggle('visible', sidebarOpen && window.innerWidth <= 768);
+        }
+
+        /** Toggle sidebar visibility (hamburger click). */
+        function toggleSidebar() {
+            setSidebarOpen(!sidebarOpen);
+        }
+
+        // Apply initial sidebar state on load (restore from sessionStorage or desktop/mobile default)
+        setSidebarOpen(sidebarOpen);
+
+        window.addEventListener('resize', function () {
+            setSidebarOpen(sidebarOpen);
+        });
+
+        /**
+         * Load chat history for sidebar: GET /sessions/history.
+         * Renders session titles; click loads that session's messages.
+         */
+        async function loadSessionsHistory() {
+            const listEl = document.getElementById('sidebarSessions');
+            if (!listEl) return;
+            try {
+                const response = await fetch(SESSIONS_HISTORY_URL, {
+                    method: 'GET',
+                    credentials: 'include'
+                });
+                if (!response.ok) {
+                    listEl.innerHTML = '<li class="sidebar-empty">Could not load history</li>';
+                    return;
+                }
+                const sessions = await response.json();
+                if (!sessions || sessions.length === 0) {
+                    listEl.innerHTML = '<li class="sidebar-empty">No chats yet</li>';
+                    return;
+                }
+                listEl.innerHTML = sessions.map(s => {
+                    const sid = s.session_id || '';
+                    const rawTitle = (s.title || 'New chat');
+                    const safeTitle = rawTitle.replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/&/g, '&amp;');
+                    const displayTitle = escapeHtml(rawTitle);
+                    const category = (s.category || 'GENERAL');
+                    const normalized = String(category).toUpperCase();
+                    const cssClass = `category-${normalized.toLowerCase()}`;
+                    const label = normalized.replace('_', ' ');
+                    /* if session_id === active_session (currentSessionId), item gets active-chat class after setSidebarActive() below */
+                    return `<li class="sidebar-item" data-session-id="${escapeHtml(sid)}" data-title="${safeTitle}" onclick="if (!event.target.closest('.sidebar-item-menu') && !event.target.closest('.sidebar-item-rename-input') && !event.target.closest('.sidebar-item-save')) { loadSessionMessages(this.getAttribute('data-session-id')); setSidebarActive(this.getAttribute('data-session-id')); }">
+                        <span class="category-badge ${cssClass}">${label}</span>
+                        <span class="sidebar-item-title">${displayTitle}</span>
+                        <div class="sidebar-item-menu">
+                            <button type="button" class="sidebar-item-menu-btn" title="Options" onclick="event.stopPropagation(); toggleSessionMenu(this)" aria-label="Options"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="12" cy="6" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="18" r="1.5"/></svg></button>
+                            <div class="sidebar-item-dropdown">
+                                <div class="sidebar-item-dropdown-option" onclick="event.stopPropagation(); closeSessionMenus(); startRenameSession(this.closest('li'))">Rename</div>
+                                <div class="sidebar-item-dropdown-option delete" onclick="event.stopPropagation(); closeSessionMenus(); deleteSession(this.closest('li').getAttribute('data-session-id'))">Delete</div>
+                            </div>
+                        </div>
+                    </li>`;
+                }).join('');
+                setSidebarActive(currentSessionId);
+            } catch (e) {
+                console.error('Load sessions history error:', e);
+                listEl.innerHTML = '<li class="sidebar-empty">Could not load history</li>';
+            }
+        }
+
+        /**
+         * ChatGPT-style history search: show suggestions while typing; hide when empty.
+         * Debounced 300ms; clicking a suggestion loads that conversation (no page reload).
+         */
+        function doHistorySearch() {
+            const input = document.getElementById('historySearchInput');
+            const suggestionsEl = document.getElementById('historySearchSuggestions');
+            if (!input || !suggestionsEl) return;
+            const q = (input.value || '').trim();
+            if (q === '') {
+                suggestionsEl.innerHTML = '';
+                suggestionsEl.style.display = 'none';
+                return;
+            }
+            fetch(`${HISTORY_SEARCH_URL}?q=${encodeURIComponent(q)}&limit=10`, { credentials: 'include' })
+                .then(function (res) { return res.ok ? res.json() : []; })
+                .then(function (data) {
+                    suggestionsEl.innerHTML = '';
+                    if (!data || data.length === 0) {
+                        suggestionsEl.innerHTML = '<div class="sidebar-search-suggestion-item" style="cursor:default;color:#8e8ea0;">No matches</div>';
+                    } else {
+                        data.forEach(function (item) {
+                            const div = document.createElement('div');
+                            div.className = 'sidebar-search-suggestion-item';
+                            div.setAttribute('data-session-id', item.session_id || '');
+                            div.innerHTML = '<div class="sidebar-search-suggestion-title">' + escapeHtml(item.title || 'New chat') + '</div>' +
+                                (item.preview ? '<div class="sidebar-search-suggestion-preview">' + escapeHtml(item.preview) + '</div>' : '');
+                            div.onclick = function () {
+                                const sessionId = this.getAttribute('data-session-id');
+                                if (!sessionId) return;
+                                loadSessionMessages(sessionId);
+                                setSidebarActive(sessionId);
+                                input.value = '';
+                                suggestionsEl.innerHTML = '';
+                                suggestionsEl.style.display = 'none';
+                                if (window.innerWidth <= 768) setSidebarOpen(false);
+                            };
+                            suggestionsEl.appendChild(div);
+                        });
+                    }
+                    suggestionsEl.style.display = 'block';
+                })
+                .catch(function () {
+                    suggestionsEl.innerHTML = '<div class="sidebar-search-suggestion-item" style="cursor:default;color:#8e8ea0;">Search failed</div>';
+                    suggestionsEl.style.display = 'block';
+                });
+        }
+        const runHistorySearch = debounceHistorySearch(doHistorySearch, 300);
+
+        /**
+         * Filter historical Q&A by category and render into the categoryResults panel.
+         * This is read-only and does NOT touch the current chat conversation.
+         */
+        async function filterCategory(category) {
+            try {
+                const normalized = (category || 'ALL').toUpperCase();
+                const url = `/api/user/queries/category/${encodeURIComponent(normalized)}`;
+                const res = await fetch(url, { credentials: 'include' });
+                if (!res.ok) {
+                    console.error('Category fetch failed:', res.status);
+                    return;
+                }
+                const data = await res.json();
+                const container = document.getElementById('categoryResults');
+                if (!container) return;
+
+                container.innerHTML = '';
+
+                if (!data || data.length === 0) {
+                    container.innerHTML = '<div class="category-results-item">No results for this category.</div>';
+                    return;
+                }
+
+                data.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'category-results-item';
+                    const createdAt = item.created_at ? new Date(item.created_at).toLocaleString() : '';
+                    div.innerHTML = `
+                        <div class="question">${item.query_text || ''}</div>
+                        <div class="answer">${item.response_text || ''}</div>
+                        <div class="meta">${createdAt}</div>
+                    `;
+                    container.appendChild(div);
+                });
+            } catch (e) {
+                console.error('filterCategory error:', e);
+            }
+        }
+
+        /**
+         * Set active chat highlight in sidebar (Fintax-style).
+         * active_session is currentSessionId (from sessionStorage); compare each item's data-session-id.
+         */
+        function setSidebarActive(sessionId) {
+            document.querySelectorAll('.sidebar-item').forEach(el => {
+                const isActive = el.getAttribute('data-session-id') === sessionId;
+                el.classList.toggle('active', isActive);
+                el.classList.toggle('active-chat', isActive);
+            });
+        }
+
+        function closeSessionMenus() {
+            document.querySelectorAll('.sidebar-item-dropdown.show').forEach(function (d) {
+                d.classList.remove('show');
+                const li = d.closest('.sidebar-item');
+                if (li) li.classList.remove('sidebar-item-menu-open');
+            });
+        }
+
+        function toggleSessionMenu(menuBtn) {
+            const menu = menuBtn.closest('.sidebar-item-menu');
+            const dropdown = menu.querySelector('.sidebar-item-dropdown');
+            const li = menuBtn.closest('.sidebar-item');
+            const isOpen = dropdown.classList.contains('show');
+            closeSessionMenus();
+            if (!isOpen) {
+                dropdown.classList.add('show');
+                if (li) li.classList.add('sidebar-item-menu-open');
+            }
+            setTimeout(function () {
+                document.addEventListener('click', function closeMenuOnce(e) {
+                    if (!dropdown.contains(e.target) && e.target !== menuBtn) {
+                        dropdown.classList.remove('show');
+                        if (li) li.classList.remove('sidebar-item-menu-open');
+                        document.removeEventListener('click', closeMenuOnce);
+                    }
+                });
+            }, 0);
+        }
+
+        /** Decode HTML entities so data-title can be used as display text. */
+        function decodeHtmlEntities(str) {
+            if (!str) return '';
+            const t = document.createElement('textarea');
+            t.innerHTML = str;
+            return t.value;
+        }
+
+        /** Close rename mode on all other sidebar items so only one is editable at a time. */
+        function closeAllOtherRenameModes(exceptLi) {
+            const listEl = document.getElementById('sidebarSessions');
+            if (!listEl) return;
+            listEl.querySelectorAll('.sidebar-item').forEach(function (other) {
+                if (other !== exceptLi && other.querySelector('.sidebar-item-rename-input')) {
+                    const prev = decodeHtmlEntities(other.getAttribute('data-title')) || 'New chat';
+                    cancelRenameSession(other, prev);
+                }
+            });
+        }
+
+        /** Show inline rename input for a sidebar item; save updates DB and UI. */
+        function startRenameSession(li) {
+            if (!li || !li.dataset.sessionId) return;
+            closeAllOtherRenameModes(li);
+            const sessionId = li.getAttribute('data-session-id');
+            const currentTitle = decodeHtmlEntities(li.getAttribute('data-title')) || 'New chat';
+            li.innerHTML = `
+                <input type="text" class="sidebar-item-rename-input" value="${escapeHtml(currentTitle)}" maxlength="200" onclick="event.stopPropagation()">
+                <button type="button" class="sidebar-item-save" onclick="event.stopPropagation(); saveRenameSession(this.closest('li'))">Save</button>
+            `;
+            const input = li.querySelector('.sidebar-item-rename-input');
+            if (input) {
+                input.focus();
+                input.select();
+                input.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter') { e.preventDefault(); saveRenameSession(li); }
+                    if (e.key === 'Escape') { cancelRenameSession(li, currentTitle); }
+                });
+            }
+        }
+
+        async function saveRenameSession(li) {
+            if (!li) return;
+            const sessionId = li.getAttribute('data-session-id');
+            const input = li.querySelector('.sidebar-item-rename-input');
+            const newTitle = (input && input.value.trim()) ? input.value.trim().slice(0, 200) : 'New chat';
+            try {
+                const response = await fetch(`/api/user/sessions/${encodeURIComponent(sessionId)}/history`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title: newTitle }),
+                    credentials: 'include'
+                });
+                if (!response.ok) throw new Error('Failed to save');
+                li.setAttribute('data-title', newTitle.replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/&/g, '&amp;'));
+                li.innerHTML = `
+                    <span class="sidebar-item-title">${escapeHtml(newTitle)}</span>
+                    <div class="sidebar-item-menu">
+                        <button type="button" class="sidebar-item-menu-btn" title="Options" onclick="event.stopPropagation(); toggleSessionMenu(this)" aria-label="Options"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="12" cy="6" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="18" r="1.5"/></svg></button>
+                        <div class="sidebar-item-dropdown">
+                            <div class="sidebar-item-dropdown-option" onclick="event.stopPropagation(); closeSessionMenus(); startRenameSession(this.closest('li'))">Rename</div>
+                        </div>
+                    </div>
+                `;
+                li.onclick = function (e) {
+                    if (!e.target.closest('.sidebar-item-menu') && !e.target.closest('.sidebar-item-rename-input') && !e.target.closest('.sidebar-item-save')) {
+                        loadSessionMessages(li.getAttribute('data-session-id'));
+                        setSidebarActive(li.getAttribute('data-session-id'));
+                    }
+                };
+            } catch (e) {
+                console.error('Rename failed:', e);
+                cancelRenameSession(li, li.getAttribute('data-title') || 'New chat');
+            }
+        }
+
+        function cancelRenameSession(li, previousTitle) {
+            if (!li || !li.dataset.sessionId) return;
+            const sessionId = li.getAttribute('data-session-id');
+            const safeTitle = (previousTitle || 'New chat').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/&/g, '&amp;');
+            li.setAttribute('data-title', safeTitle);
+            li.innerHTML = `
+                <span class="sidebar-item-title">${escapeHtml(previousTitle || 'New chat')}</span>
+                <div class="sidebar-item-menu">
+                    <button type="button" class="sidebar-item-menu-btn" title="Options" onclick="event.stopPropagation(); toggleSessionMenu(this)" aria-label="Options"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="12" cy="6" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="18" r="1.5"/></svg></button>
+                    <div class="sidebar-item-dropdown">
+                        <div class="sidebar-item-dropdown-option" onclick="event.stopPropagation(); closeSessionMenus(); startRenameSession(this.closest('li'))">Rename</div>
+                    </div>
+                </div>
+            `;
+            li.onclick = function (e) {
+                if (!e.target.closest('.sidebar-item-menu') && !e.target.closest('.sidebar-item-rename-input') && !e.target.closest('.sidebar-item-save')) {
+                    loadSessionMessages(sessionId);
+                    setSidebarActive(sessionId);
+                }
+            };
+        }
+
+        /**
+         * Add a new history item to the sidebar immediately (e.g. on first message) without waiting for GET /sessions/history.
+         * Title can be first 4 words of question; backend will replace with generated title on next refresh.
+         */
+        function prependSidebarItem(sessionId, titleText) {
+            const listEl = document.getElementById('sidebarSessions');
+            if (!listEl) return;
+            const title = (titleText || '').trim().split(/\s+/).slice(0, 4).join(' ') || 'New chat';
+            const safeTitle = title.replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/&/g, '&amp;');
+            const li = document.createElement('li');
+            li.className = 'sidebar-item';
+            li.setAttribute('data-session-id', sessionId);
+            li.setAttribute('data-title', safeTitle);
+            li.innerHTML = `<span class="sidebar-item-title">${escapeHtml(title)}</span><div class="sidebar-item-menu"><button type="button" class="sidebar-item-menu-btn" title="Options" onclick="event.stopPropagation(); toggleSessionMenu(this)" aria-label="Options"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="12" cy="6" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="18" r="1.5"/></svg></button><div class="sidebar-item-dropdown"><div class="sidebar-item-dropdown-option" onclick="event.stopPropagation(); closeSessionMenus(); startRenameSession(this.closest('li'))">Rename</div><div class="sidebar-item-dropdown-option delete" onclick="event.stopPropagation(); closeSessionMenus(); deleteSession(this.closest('li').getAttribute('data-session-id'))">Delete</div></div></div>`;
+            li.onclick = function (e) {
+                if (!e.target.closest('.sidebar-item-menu') && !e.target.closest('.sidebar-item-rename-input') && !e.target.closest('.sidebar-item-save')) {
+                    loadSessionMessages(sessionId);
+                    setSidebarActive(sessionId);
+                }
+            };
+            const emptyNote = listEl.querySelector('.sidebar-empty');
+            if (emptyNote) {
+                emptyNote.replaceWith(li);
+            } else {
+                listEl.insertBefore(li, listEl.firstChild);
+            }
+        }
+
+        async function deleteSession(sessionId) {
+            if (!sessionId) return;
+            if (!confirm('Are you sure you want to delete this conversation? This action cannot be undone.')) return;
+
+            try {
+                // Correct route is /api/user/sessions/{sessionId}
+                const url = '/api/user/sessions/' + encodeURIComponent(sessionId);
+                const response = await fetch(url, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
+
+                if (response.ok) {
+                    // Remove from sidebar
+                    const item = document.querySelector(`.sidebar-item[data-session-id="${sessionId}"]`);
+                    if (item) item.remove();
+
+                    // If it was the active session, reset everything
+                    if (sessionId === currentSessionId) {
+                        currentSessionId = null;
+                        sessionStorage.removeItem('currentSessionId');
+                        // Start a new chat to reset the UI
+                        newChat();
+                    }
+
+                    // If sidebar is empty now
+                    const listEl = document.getElementById('sidebarSessions');
+                    if (listEl && listEl.children.length === 0) {
+                        listEl.innerHTML = '<li class="sidebar-empty">No chats yet</li>';
+                    }
+                } else {
+                    const error = await response.json();
+                    alert('Error: ' + (error.detail || 'Could not delete session'));
+                }
+            } catch (e) {
+                console.error('Delete session error:', e);
+                alert('Could not connect to server to delete session.');
+            }
+        }
+
+        /**
+         * Load full conversation for a session: GET /sessions/{session_id}/messages.
+         * Clears chat area and renders query/answer pairs; sets currentSessionId.
+         */
+        async function loadSessionMessages(sessionId) {
+            if (!sessionId) return;
+            try {
+                const response = await fetch(SESSION_MESSAGES_URL(sessionId), {
+                    method: 'GET',
+                    headers: { 'X-User-ID': currentUserId },
+                    credentials: 'include'
+                });
+                if (!response.ok) {
+                    if (response.status === 403) console.warn('Cannot access session');
+                    return;
+                }
+                const messages = await response.json();
+                currentSessionId = sessionId;
+                sessionStorage.setItem('sessionId', sessionId);
+
+                const messagesArea = document.getElementById('messagesArea');
+                const welcomeScreen = document.getElementById('welcomeScreen');
+                if (welcomeScreen) welcomeScreen.style.display = 'none';
+                messagesArea.innerHTML = '';
+                messageHistory = [];
+
+                (messages || []).forEach(m => {
+                    const isEdited = !!(m.query_metadata && m.query_metadata.edited);
+                    const category = (m.category || 'GENERAL');
+                    const opts = { queryId: m.query_id, responseId: m.response_id, isEdited, category };
+                    addMessage('user', m.query_text || '', [], null, 'no_react', opts);
+                    const reactEmoji = (typeof m.react === 'string' && m.react && m.react !== 'no_react') ? m.react : 'no_react';
+                    addMessage('assistant', m.response_text || '', [], m.message_id || null, reactEmoji, opts);
+                });
+
+                // Restored session with messages → hide toggle (ChatGPT-style)
+                if (messages && messages.length > 0) {
+                    isChatStarted = true;
+                    updateToggleVisibility();
+                }
+
+                const ws = document.getElementById('welcomeScreen');
+                if (messages.length === 0 && ws) ws.style.display = 'block';
+                if (window.innerWidth <= 768) toggleSidebar();
+            } catch (e) {
+                console.error('Load session messages error:', e);
+            }
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        /**
+         * Patch the last user message in the thread with query_id/response_id and edit+copy controls.
+         * Used after sendMessage() when we get query_id/response_id from the backend (no full reload).
+         */
+        function patchLastUserMessageWithIds(queryId, responseId, content, categoryOverride = null) {
+            const messagesArea = document.getElementById('messagesArea');
+            if (!messagesArea) return;
+            const userMessages = messagesArea.querySelectorAll('.message.user');
+            const lastUser = userMessages[userMessages.length - 1];
+            if (!lastUser) return;
+            lastUser.setAttribute('data-query-id', queryId);
+            lastUser.setAttribute('data-response-id', responseId);
+            const contentEl = lastUser.querySelector('.message-content');
+            if (!contentEl) return;
+            const bodyContent = formatMessageContent(content);
+            const category = (categoryOverride || '').trim()
+                || lastUser.getAttribute('data-category')
+                || detectCategory(content || '');
+            if (category) lastUser.setAttribute('data-category', String(category));
+            let categoryBadge = '';
+            if (category) {
+                const normalized = String(category).toUpperCase();
+                const cssClass = `category-${normalized.toLowerCase()}`;
+                const label = normalized.replace('_', ' ');
+                categoryBadge = `<span class="category-badge ${cssClass}">${label}</span>`;
+            }
+            const controlsHtml = `<div class="message-controls">
+                <button type="button" class="btn-msg" title="Edit" onclick="startEditMessage(${queryId}, this)">✏️</button>
+                <button type="button" class="btn-msg" title="Copy" onclick="copyMessage(this)">📋</button>
+            </div>`;
+            const wrap = `<div class="message-content-wrap"><div class="message-body">${categoryBadge}${bodyContent}</div>${controlsHtml}</div>`;
+            const filesBlock = contentEl.querySelector('.message-files');
+            contentEl.innerHTML = wrap + (filesBlock ? filesBlock.outerHTML : '');
+            const idx = messageHistory.length - 2;
+            if (idx >= 0 && messageHistory[idx].role === 'user') {
+                messageHistory[idx].queryId = queryId;
+                messageHistory[idx].responseId = responseId;
+            }
+        }
+
+        /** Get plain text from a message bubble (strip HTML). For copy. */
+        function getMessagePlainText(messageEl) {
+            if (!messageEl) return '';
+            const body = messageEl.querySelector('.message-body');
+            const content = messageEl.querySelector('.message-content');
+            const el = body || content;
+            if (!el) return '';
+            const div = document.createElement('div');
+            div.innerHTML = el.innerHTML;
+            return (div.textContent || div.innerText || '').trim();
+        }
+
+        /**
+         * Copy message text to clipboard (works for both user and assistant bubbles).
+         * Uses navigator.clipboard API.
+         */
+        async function copyMessage(btn) {
+            const messageEl = (btn && btn.closest) ? btn.closest('.message') : null;
+            if (!messageEl) return;
+            const text = getMessagePlainText(messageEl);
+            if (!text) return;
+            try {
+                await navigator.clipboard.writeText(text);
+                const t = btn.textContent;
+                btn.textContent = '✓';
+                setTimeout(() => { btn.textContent = t || '📋'; }, 1200);
+            } catch (e) {
+                console.warn('Clipboard copy failed:', e);
+            }
+        }
+
+        /**
+         * Start inline edit for a user question: replace content with textarea + Save/Cancel.
+         * On Save: POST /chat/edit, then update only this user bubble and the next assistant bubble.
+         */
+        function startEditMessage(queryId, btn) {
+            const messageEl = btn && btn.closest ? btn.closest('.message') : null;
+            if (!messageEl || !messageEl.classList.contains('user')) return;
+            const currentText = getMessagePlainText(messageEl);
+            const wrap = messageEl.querySelector('.message-content-wrap');
+            if (!wrap) return;
+            const body = wrap.querySelector('.message-body');
+            if (!body) return;
+            const textarea = document.createElement('textarea');
+            textarea.value = currentText;
+            textarea.className = 'inline-edit-textarea';
+            const actions = document.createElement('div');
+            actions.className = 'inline-edit-actions';
+            const saveBtn = document.createElement('button');
+            saveBtn.className = 'btn-save-edit';
+            saveBtn.textContent = 'Save';
+            const cancelBtn = document.createElement('button');
+            cancelBtn.className = 'btn-cancel-edit';
+            cancelBtn.textContent = 'Cancel';
+            const editWrap = document.createElement('div');
+            editWrap.className = 'inline-edit-wrap';
+            editWrap.appendChild(textarea);
+            actions.appendChild(saveBtn);
+            actions.appendChild(cancelBtn);
+            editWrap.appendChild(actions);
+            body.innerHTML = '';
+            body.appendChild(editWrap);
+            textarea.focus();
+
+            cancelBtn.onclick = function () {
+                body.innerHTML = formatMessageContent(currentText);
+            };
+
+            saveBtn.onclick = async function () {
+                const newText = (textarea.value || '').trim();
+                if (!newText) return;
+                saveBtn.disabled = true;
+                saveBtn.textContent = 'Saving...';
+                try {
+                    const res = await fetch('/api/user/chat/edit', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ query_id: queryId, new_text: newText }),
+                        credentials: 'include'
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok) {
+                        alert(data.detail || 'Edit failed');
+                        return;
+                    }
+                    body.innerHTML = formatMessageContent(newText);
+                    let editedSpan = wrap.querySelector('.message-edited-label');
+                    if (!editedSpan) {
+                        editedSpan = document.createElement('span');
+                        editedSpan.className = 'message-edited-label';
+                        editedSpan.textContent = '(edited)';
+                        wrap.appendChild(editedSpan);
+                    }
+                    const assistantMsg = messageEl.nextElementSibling;
+                    if (assistantMsg && assistantMsg.classList.contains('assistant') && data.answer != null) {
+                        const asstBody = assistantMsg.querySelector('.message-body');
+                        if (asstBody) asstBody.innerHTML = formatMessageContent(data.answer);
+                        const asstIdx = messageHistory.findIndex(m => m.role === 'assistant' && assistantMsg.getAttribute('data-query-id') == queryId);
+                        if (asstIdx !== -1) messageHistory[asstIdx].content = data.answer;
+                    }
+                    const userIdx = messageHistory.findIndex(m => m.role === 'user' && messageEl.getAttribute('data-query-id') == queryId);
+                    if (userIdx !== -1) {
+                        messageHistory[userIdx].content = newText;
+                        messageHistory[userIdx].isEdited = true;
+                    }
+                    // Remove future messages from UI (backend marked them hidden; no full reload)
+                    if (assistantMsg) {
+                        let next = assistantMsg.nextElementSibling;
+                        while (next) {
+                            const toRemove = next;
+                            next = next.nextElementSibling;
+                            toRemove.remove();
+                        }
+                    }
+                    // Trim messageHistory to match visible messages (keep only up to this assistant reply)
+                    const asstIdx = messageHistory.findIndex(m => m.role === 'assistant' && m.queryId == queryId);
+                    if (asstIdx !== -1 && messageHistory.length > asstIdx + 1) messageHistory.splice(asstIdx + 1);
+                } catch (e) {
+                    alert('Edit request failed: ' + (e.message || 'Network error'));
+                } finally {
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = 'Save';
+                }
+            };
+        }
+
+        /**
+         * Regenerate answer for the same question. Calls POST /chat/regenerate, updates only the assistant bubble.
+         */
+        async function regenerateMessage(queryId, btn) {
+            const messageEl = btn && btn.closest ? btn.closest('.message') : null;
+            if (!messageEl) return;
+            const originalText = btn.textContent;
+            btn.textContent = '...';
+            btn.disabled = true;
+            try {
+                const res = await fetch('/api/user/chat/regenerate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query_id: queryId }),
+                    credentials: 'include'
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    alert(data.detail || 'Regenerate failed');
+                    return;
+                }
+                const body = messageEl.querySelector('.message-body');
+                if (body && data.answer != null) {
+                    body.innerHTML = formatMessageContent(data.answer);
+                    const asstIdx = messageHistory.findIndex(m => m.role === 'assistant' && (m.queryId == queryId || messageEl.getAttribute('data-query-id') == queryId));
+                    if (asstIdx !== -1) messageHistory[asstIdx].content = data.answer;
+                }
+            } catch (e) {
+                alert('Regenerate failed: ' + (e.message || 'Network error'));
+            } finally {
+                btn.disabled = false;
+                btn.textContent = originalText || '🔄';
+            }
+        }
+
+        // Auto-resize textarea
+        const chatInput = document.getElementById('chatInput');
+        chatInput.addEventListener('input', function () {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 200) + 'px';
+        });
+
+        // Enter to send, Shift+Enter for new line
+        chatInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // File input: selected files are uploaded to backend on Send (POST /api/user/upload); user_id from JWT email.
+        document.getElementById('fileInput').addEventListener('change', function (e) {
+            const files = Array.from(e.target.files);
+            files.forEach(file => {
+                if (!selectedFiles.find(f => f.name === file.name && f.size === file.size)) {
+                    selectedFiles.push(file);
+                }
+            });
+            updateFilePreview();
+        });
+
+        function updateFilePreview() {
+            const preview = document.getElementById('filePreview');
+            if (selectedFiles.length === 0) {
+                preview.style.display = 'none';
+                return;
+            }
+
+            preview.style.display = 'flex';
+            preview.innerHTML = selectedFiles.map((file, index) => `
+                <div class="file-preview-item">
+                    <span>📄 ${file.name}</span>
+                    <span class="remove" onclick="removeFile(${index})">×</span>
+                </div>
+            `).join('');
+        }
+
+        function removeFile(index) {
+            selectedFiles.splice(index, 1);
+            updateFilePreview();
+        }
+
+        /**
+         * Upload selected files to backend. Files are saved to disk (uploads/) and DB (file_uploads).
+         * user_id is set from authenticated email (JWT cookie) on the server; no client-supplied user_id.
+         * @param {File[]} files - Array of File objects
+         * @param {string|null} sessionId - Current chat session_id (optional)
+         * @returns {Object} - { uploaded: number, failed: number, errors: string[] }
+         */
+        async function uploadFiles(files, sessionId) {
+            const result = { uploaded: 0, failed: 0, errors: [] };
+            if (!files || files.length === 0) return result;
+            for (const file of files) {
+                try {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    if (sessionId) formData.append('session_id', sessionId);
+                    const res = await fetch(UPLOAD_URL, {
+                        method: 'POST',
+                        body: formData,
+                        credentials: 'include'
+                    });
+                    if (res.ok) {
+                        result.uploaded++;
+                    } else {
+                        result.failed++;
+                        const err = await res.json().catch(() => ({}));
+                        result.errors.push(`${file.name}: ${err.detail || res.statusText}`);
+                    }
+                } catch (e) {
+                    result.failed++;
+                    result.errors.push(`${file.name}: ${e.message || 'Network error'}`);
+                }
+            }
+            return result;
+        }
+
+        function askQuestion(question) {
+            document.getElementById('chatInput').value = question;
+            sendMessage();
+        }
+
+        function detectCategory(question) {
+            const q = (question || '').toLowerCase();
+            const trimmed = q.trim();
+            if (q.includes('gst') || q.includes('gst return') || q.includes('gst penalty')) {
+                return 'GST';
+            }
+            // TDS should win over Income Tax for salary-related TDS questions.
+            if (q.includes('tds') || q.includes('tax deducted at source') || q.includes('section 192') || q.includes('withholding tax')) {
+                return 'TDS';
+            }
+            if (q.includes('income tax') || q.includes('itr') || q.includes('tax rebate')) {
+                return 'INCOME_TAX';
+            }
+            if (q.includes('tds deduction') || q.includes('tds filing')) return 'TDS';
+            if (q.includes('roc') || q.includes('company filing') || q.includes('roc annual filing')) {
+                return 'ROC';
+            }
+            return 'GENERAL';
+        }
+
+        function addMessage(role, content, files = [], messageId = null, reactionEmoji = 'no_react', options = {}) {
+            const messagesArea = document.getElementById('messagesArea');
+            const welcomeScreen = document.getElementById('welcomeScreen');
+            const queryId = options.queryId != null ? options.queryId : null;
+            const responseId = options.responseId != null ? options.responseId : null;
+            const isEdited = !!options.isEdited;
+            const category = options.category || null;
+
+            if (welcomeScreen) {
+                welcomeScreen.style.display = 'none';
+            }
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role}`;
+            if (messageId) messageDiv.setAttribute('data-message-id', messageId);
+            if (queryId != null) messageDiv.setAttribute('data-query-id', queryId);
+            if (responseId != null) messageDiv.setAttribute('data-response-id', responseId);
+            if (role === 'user' && category) messageDiv.setAttribute('data-category', String(category));
+
+            let filesHtml = '';
+            if (files && files.length > 0) {
+                filesHtml = `<div class="message-files">${files.map(f => `
+                    <div class="file-tag">📎 ${f.name}</div>
+                `).join('')}</div>`;
+            }
+
+            // Fintax-style controls: edit + copy for user; regenerate + copy for assistant (shown on hover)
+            let controlsHtml = '';
+            if (queryId != null) {
+                if (role === 'user') {
+                    controlsHtml = `<div class="message-controls">
+                        <button type="button" class="btn-msg" title="Edit" onclick="startEditMessage(${queryId}, this)">✏️</button>
+                        <button type="button" class="btn-msg" title="Copy" onclick="copyMessage(this)">📋</button>
+                    </div>`;
+                } else {
+                    controlsHtml = `<div class="message-controls">
+                        <button type="button" class="btn-msg" title="Regenerate" onclick="regenerateMessage(${queryId}, this)">🔄</button>
+                        <button type="button" class="btn-msg" title="Copy" onclick="copyMessage(this)">📋</button>
+                    </div>`;
+                }
+            }
+
+            const editedLabel = (role === 'user' && isEdited) ? '<span class="message-edited-label">(edited)</span>' : '';
+            const bodyContent = formatMessageContent(content);
+
+            // Category badge for user messages
+            let categoryBadge = '';
+            if (role === 'user' && category) {
+                const normalized = String(category).toUpperCase();
+                const cssClass = `category-${normalized.toLowerCase()}`;
+                const label = normalized.replace('_', ' ');
+                categoryBadge = `<span class="category-badge ${cssClass}">${label}</span>`;
+            }
+
+            // Always wrap user messages so category badge shows immediately,
+            // even before query_id is returned from the backend.
+            const shouldWrap = (role === 'user') || (queryId != null);
+            const wrapContent = shouldWrap
+                ? `<div class="message-content-wrap">
+                        <div class="message-body">
+                            ${categoryBadge}
+                            ${bodyContent}
+                        </div>
+                        ${controlsHtml}${editedLabel}
+                   </div>`
+                : bodyContent;
+
+            // Emoji picker below each bot message; one active emoji per message
+            let actionsHtml = '';
+            if (role === 'assistant' && messageId) {
+                const hasReact = reactionEmoji && reactionEmoji !== 'no_react';
+                actionsHtml = `
+                    <div class="message-actions">
+                        <div class="reactions-container" id="reactions-${messageId}" data-message-id="${messageId}">
+                            ${hasReact ? `<span class="reaction-emoji active" data-emoji="${reactionEmoji}">${reactionEmoji}</span>` : ''}
+                            <button class="add-reaction-btn" onclick="showEmojiPicker(${messageId}, this)" title="Add reaction">+</button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            messageDiv.innerHTML = `
+                <div class="message-content">
+                    ${wrapContent}
+                    ${filesHtml}
+                    ${actionsHtml}
+                </div>
+            `;
+
+            messagesArea.appendChild(messageDiv);
+            messagesArea.scrollTop = messagesArea.scrollHeight;
+
+            messageHistory.push({ role, content, files, messageId, reactionEmoji, queryId, responseId, isEdited });
+        }
+
+        function formatMessageContent(text) {
+            if (!text) return '';
+
+            // Escape HTML first
+            let formatted = text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+
+            // Parse markdown tables so they render as proper HTML tables (fix column alignment, rows preserved)
+            formatted = parseMarkdownTables(formatted);
+
+            // Convert markdown bold
+            formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+            // Convert bullet points
+            formatted = formatted.replace(/^(\s*)-\s+/gm, '$1• ');
+
+            // Convert numbered lists
+            formatted = formatted.replace(/^(\d+)\.\s+/gm, '$1. ');
+
+            // Convert newlines to <br>
+            formatted = formatted.replace(/\n/g, '<br>');
+
+            // Remove emojis from displayed answer (Unicode ranges + common symbols)
+            formatted = formatted.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F600}-\u{1F64F}\u{1F1E0}-\u{1F1FF}\u{FE00}-\u{FE0F}\u{203C}\u{2049}\u{2122}\u{2139}\u{2194}-\u{2199}\u{231A}-\u{231B}\u{2328}\u{23CF}\u{23E9}-\u{23F3}\u{25AA}-\u{25AB}\u{25B6}\u{25C0}\u{25FB}-\u{25FE}\u{2614}-\u{2615}\u{2648}-\u{2653}\u{267F}\u{2693}\u{26A1}\u{26AA}-\u{26AB}\u{26BD}-\u{26BE}\u{26C4}-\u{26C5}\u{26CE}\u{26D4}\u{26EA}\u{26F2}-\u{26F3}\u{26F5}\u{26FA}\u{26FD}\u{2702}\u{2705}\u{2708}-\u{270D}\u{270F}\u{2712}\u{2714}\u{2716}\u{271D}\u{2721}\u{2728}\u{2733}-\u{2734}\u{2744}\u{2747}\u{274C}\u{274E}\u{2753}-\u{2755}\u{2757}\u{2763}-\u{2764}\u{2795}-\u{2797}\u{27A1}\u{27B0}\u{27BF}\u{2934}-\u{2935}\u{2B05}-\u{2B07}\u{2B1B}-\u{2B1C}\u{2B50}\u{2B55}\u{3030}\u{303D}\u{3297}\u{3299}]/gu, '');
+
+            return formatted;
+        }
+
+        function parseMarkdownTables(text) {
+            var lines = text.split('\n');
+            var out = [];
+            var i = 0;
+
+            function isTableRow(line) {
+                var t = line.trim();
+                if (!t || !t.startsWith('|') || !t.endsWith('|')) return false;
+                return (t.match(/\|/g) || []).length >= 2;
+            }
+            function isSeparator(line) {
+                var t = line.trim();
+                if (!t.startsWith('|') || !t.endsWith('|')) return false;
+                return /^\|[\s\-:|]+\|$/.test(t);
+            }
+            function parseRow(line) {
+                var cells = line.trim().split('|').map(function (s) { return s.trim(); });
+                if (cells.length && cells[0] === '') cells.shift();
+                if (cells.length && cells[cells.length - 1] === '') cells.pop();
+                return cells;
+            }
+
+            while (i < lines.length) {
+                var line = lines[i];
+                if (isTableRow(line)) {
+                    var tableLines = [];
+                    while (i < lines.length && isTableRow(lines[i])) {
+                        tableLines.push(lines[i]);
+                        i++;
+                    }
+                    var headerCells = parseRow(tableLines[0]);
+                    var bodyStart = 1;
+                    if (tableLines.length > 1 && isSeparator(tableLines[1])) bodyStart = 2;
+                    var tableHtml = '<table><thead><tr>';
+                    for (var h = 0; h < headerCells.length; h++) {
+                        tableHtml += '<th>' + headerCells[h] + '</th>';
+                    }
+                    tableHtml += '</tr></thead><tbody>';
+                    for (var r = bodyStart; r < tableLines.length; r++) {
+                        var cells = parseRow(tableLines[r]);
+                        tableHtml += '<tr>';
+                        for (var c = 0; c < cells.length; c++) {
+                            tableHtml += '<td>' + cells[c] + '</td>';
+                        }
+                        tableHtml += '</tr>';
+                    }
+                    tableHtml += '</tbody></table>';
+                    out.push(tableHtml);
+                    continue;
+                }
+                out.push(line);
+                i++;
+            }
+            return out.join('\n');
+        }
+
+        /** Show thinking bubble (Fintax-style). Replaced by real answer when response arrives. */
+        function showLoading() {
+            const messagesArea = document.getElementById('messagesArea');
+            const welcomeScreen = document.getElementById('welcomeScreen');
+
+            if (welcomeScreen) {
+                welcomeScreen.style.display = 'none';
+            }
+
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'message assistant thinking-indicator';
+            loadingDiv.id = 'loadingMessage';
+            loadingDiv.innerHTML = `
+                <div class="message-content">
+                    <div class="thinking-text">Sending...</div>
+                </div>
+            `;
+
+            messagesArea.appendChild(loadingDiv);
+            messagesArea.scrollTop = messagesArea.scrollHeight;
+
+            // After a short pause, switch to "Thinking your query..." (sending → thinking phase)
+            setTimeout(function () {
+                const el = document.querySelector('#loadingMessage .thinking-text');
+                if (el) el.textContent = 'Thinking your query...';
+            }, 600);
+        }
+
+        /** Remove thinking bubble; call before adding the actual assistant message. */
+        function removeLoading() {
+            const loading = document.getElementById('loadingMessage');
+            if (loading) {
+                loading.remove();
+            }
+        }
+
+        async function sendMessage() {
+            const question = chatInput.value.trim();
+            const files = [...selectedFiles];
+
+            if (!question && files.length === 0) {
+                return;
+            }
+
+            // Add user message with local category detection for immediate UI badge
+            const localCategory = question ? detectCategory(question) : null;
+            addMessage('user', question, files, null, 'no_react', { category: localCategory });
+
+
+            // First message sent → hide toggle (ChatGPT-style)
+            if (!isChatStarted) {
+                isChatStarted = true;
+                updateToggleVisibility();
+            }
+
+            // Clear input and files
+            chatInput.value = '';
+            chatInput.style.height = 'auto';
+            selectedFiles = [];
+            updateFilePreview();
+
+            // Disable send button
+            const sendBtn = document.getElementById('sendBtn');
+            sendBtn.disabled = true;
+            sendBtn.textContent = 'Sending...';
+
+            isGenerating = true;
+            showLoading();
+
+            let uploadResult = { uploaded: 0, failed: 0, errors: [] };
+            try {
+                // Upload files first: saved to disk (uploads/) and DB (file_uploads). user_id = authenticated email from JWT cookie.
+                if (files.length > 0) {
+                    uploadResult = await uploadFiles(files, currentSessionId);
+                    if (uploadResult.uploaded > 0) {
+                        console.log(`Uploaded ${uploadResult.uploaded} file(s) to backend.`);
+                    }
+                    if (uploadResult.failed > 0) {
+                        console.warn('Some file uploads failed:', uploadResult.errors);
+                    }
+                }
+
+                // When user sent only files (no question), show upload result and skip chat API.
+                if (!question && files.length > 0) {
+                    isGenerating = false;
+                    removeLoading();
+                    let uploadMsg;
+                    if (uploadResult.uploaded > 0 && uploadResult.failed === 0) {
+                        uploadMsg = 'File successfully uploaded.';
+                    } else if (uploadResult.uploaded === 0) {
+                        uploadMsg = 'File not saved.';
+                    } else {
+                        uploadMsg = `${uploadResult.uploaded} file(s) uploaded. ${uploadResult.failed} not saved.`;
+                    }
+                    addMessage('assistant', uploadMsg, [], null, 'no_react');
+                    loadSessionsHistory();
+                    return;
+                }
+
+                // Send session_id when available (Fintax-style: continue session on refresh)
+                const chatPayload = {
+                    question,
+                    is_temporary: isTemporaryChat
+                };
+                if (currentSessionId) chatPayload.session_id = currentSessionId;
+
+                const response = await fetch('/api/user/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(chatPayload),
+                    credentials: 'include'
+                });
+
+                const text = await response.text();
+                let data;
+
+                try {
+                    data = JSON.parse(text);
+                } catch (parseError) {
+                    throw new Error("Server returned invalid JSON");
+                }
+
+                isGenerating = false;
+                removeLoading();
+
+                if (data.status === "error") {
+                    addMessage('assistant', `Error: ${data.message}`);
+                    return;
+                }
+
+                // Handle success response
+                let answerText = data.answer || data.reply || 'No answer provided';
+                const messageId = data.message_id || null;
+                const sessionId = data.session_id || null;
+
+                // When user uploaded files: replace "No answer provided" with upload status message.
+                if (files.length > 0 && answerText === 'No answer provided') {
+                    if (uploadResult.uploaded > 0 && uploadResult.failed === 0) {
+                        answerText = 'File successfully uploaded.';
+                    } else if (uploadResult.uploaded === 0) {
+                        answerText = 'File not saved.';
+                    } else {
+                        answerText = `${uploadResult.uploaded} file(s) uploaded. ${uploadResult.failed} not saved.`;
+                    }
+                }
+
+                // First message: add new history item to sidebar immediately (do not wait for refresh)
+                if (sessionId && messageHistory.length === 1 && !isTemporaryChat) {
+                    prependSidebarItem(sessionId, question);
+                    setSidebarActive(sessionId);
+                }
+
+                // Always update and store session_id from response (sessionStorage survives refresh, clears on tab close)
+                if (sessionId) {
+                    currentSessionId = sessionId;
+                    sessionStorage.setItem('sessionId', sessionId);
+                    console.log('Session ID updated:', sessionId);
+                }
+
+                // Debug: Log message_id to console
+                if (messageId) {
+                    console.log('Message ID received:', messageId);
+                } else {
+                    console.warn('Warning: No message_id in response. Like feature will not work for this message.');
+                }
+
+                // Add assistant message with query_id/response_id for regenerate + copy controls
+                addMessage('assistant', answerText, [], messageId, 'no_react', { queryId: data.query_id, responseId: data.response_id });
+                // Patch the user message we added earlier (no query_id yet) with ids and controls
+                patchLastUserMessageWithIds(data.query_id, data.response_id, question, data.category || null);
+
+                // Refresh sidebar so auto-generated title appears
+                loadSessionsHistory();
+                if (sessionId) setSidebarActive(sessionId);
+
+            } catch (error) {
+                isGenerating = false;
+                removeLoading();
+                addMessage('assistant', `Error: ${error.message || 'Failed to get response'}`);
+            } finally {
+                sendBtn.disabled = false;
+                sendBtn.textContent = 'Send';
+            }
+        }
+
+        // New Chat functionality - Close current session and start fresh
+        async function newChat() {
+            try {
+                // Call backend to close current session and create new one
+                const response = await fetch('/api/user/chat/new', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({}),
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ detail: 'Failed to create new chat' }));
+                    console.error('New chat error:', errorData.detail || 'Unknown error');
+                    // Continue anyway - clear UI even if backend call fails
+                } else {
+                    const data = await response.json();
+                    if (data.session_id) {
+                        currentSessionId = data.session_id;
+                        sessionStorage.setItem('sessionId', data.session_id);
+                        console.log('New session created:', data.session_id);
+                    }
+                }
+
+                // Refresh sidebar so new session appears and previous is still listed
+                loadSessionsHistory();
+                setSidebarActive(currentSessionId || '');
+
+                // Clear chat UI
+                const messagesArea = document.getElementById('messagesArea');
+                const welcomeScreen = document.getElementById('welcomeScreen');
+
+                // Remove all messages
+                messagesArea.innerHTML = '';
+
+                // Show welcome screen
+                if (welcomeScreen) {
+                    welcomeScreen.style.display = 'block';
+                } else {
+                    // Recreate welcome screen if it was removed
+                    const welcomeDiv = document.createElement('div');
+                    welcomeDiv.className = 'welcome-screen';
+                    welcomeDiv.id = 'welcomeScreen';
+                    welcomeDiv.innerHTML = `
+                        <h2 id="welcomeTitle">Welcome to Tax Assistant</h2>
+                        <p id="welcomeSubtitle">AI-powered GST and Tax Consultation</p>
+                        <div class="example-questions">
+                            <div class="example-question" onclick="askQuestion('What is GST?')">
+                                💡 What is GST?
+                            </div>
+                            <div class="example-question" onclick="askQuestion('How to file GST returns?')">
+                                📋 How to file GST returns?
+                            </div>
+                            <div class="example-question" onclick="askQuestion('Difference between Old and New Tax Regime')">
+                                💰 Difference between Old and New Tax Regime
+                            </div>
+                            <div class="example-question" onclick="askQuestion('What are the GST rates in India?')">
+                                📊 What are the GST rates in India?
+                            </div>
+                        </div>
+                    `;
+                    messagesArea.appendChild(welcomeDiv);
+                }
+
+                // Clear message history and reset chat-started state so toggle is visible again
+                messageHistory = [];
+                isChatStarted = false;
+                updateToggleVisibility();
+                setWelcomePhrase();
+
+                // Clear input
+                chatInput.value = '';
+                chatInput.style.height = 'auto';
+                selectedFiles = [];
+                updateFilePreview();
+
+            } catch (error) {
+                console.error('Error creating new chat:', error);
+                // Still clear UI even if API call fails
+                const messagesArea = document.getElementById('messagesArea');
+                messagesArea.innerHTML = '';
+                messageHistory = [];
+                isChatStarted = false;
+                updateToggleVisibility();
+                setWelcomePhrase();
+            }
+        }
+
+        // Health check
+        async function checkHealth() {
+            try {
+                const response = await fetch('/health');
+                const data = await response.json();
+
+                // Database:
+                // - green : DB connected
+                // - red   : DB not connected
+                const dbHealthy = !!data.database_connected;
+                updateStatusIndicator('dbStatus', dbHealthy, false);
+
+                // LLM API:
+                // - green : API key configured (runtime will handle retries/errors)
+                // - red   : no API key configured
+                const llmHealthy = !!data.llm_configured || !!data.llm_available;
+                const llmDegraded = false;
+                updateStatusIndicator('llmStatus', llmHealthy, llmDegraded);
+
+                // Query expansion & reranking: simple on/off for now
+                updateStatusIndicator('expansionStatus', !!data.query_expansion_available, false);
+                updateStatusIndicator('rerankStatus', !!data.reranking_available, false);
+
+            } catch (error) {
+                // Set all to unavailable on error
+                ['dbStatus', 'llmStatus', 'expansionStatus', 'rerankStatus'].forEach(id => {
+                    updateStatusIndicator(id, false, false);
+                });
+            }
+        }
+
+        function updateStatusIndicator(id, isHealthy, isDegraded = false) {
+            const indicator = document.getElementById(id);
+            if (!indicator) return;
+
+            let statusClass = 'unavailable';
+            if (isHealthy) {
+                statusClass = 'healthy';
+            } else if (isDegraded) {
+                statusClass = 'degraded';
+            }
+
+            indicator.className = 'status-indicator ' + statusClass;
+        }
+
+        // Initial health check and load session history for sidebar
+        checkHealth();
+        setInterval(checkHealth, 30000);
+
+        // Page load: load sidebar, then restore current session only on real reloads.
+        // After a fresh navigation (e.g. after login redirect), we clear sessionId so the welcome
+        // screen shows and the user can pick a session from history (ChatGPT-style).
+        (async function initSession() {
+            let navType = "navigate";
+            try {
+                const navEntries = performance.getEntriesByType && performance.getEntriesByType("navigation");
+                if (navEntries && navEntries[0] && navEntries[0].type) {
+                    navType = navEntries[0].type;
+                } else if (performance.navigation && typeof performance.navigation.type === "number") {
+                    // 1 = reload in old Navigation Timing API
+                    navType = performance.navigation.type === 1 ? "reload" : "navigate";
+                }
+            } catch (e) {
+                // ignore, default to "navigate"
+            }
+
+            const isTemp = sessionStorage.getItem("temporaryChat") === "true";
+
+            // For non-reload navigations (e.g. after login redirect), do not auto-restore last session
+            // and reset temporary chat mode so we always start in normal mode.
+            if (navType !== "reload" && navType !== "back_forward") {
+                sessionStorage.removeItem("sessionId");
+                sessionStorage.removeItem("temporaryChat");
+                isTemporaryChat = false;
+            }
+
+            const savedSessionId = sessionStorage.getItem("sessionId");
+
+            console.log("Page load");
+            console.log("Navigation type:", navType);
+            console.log("Session:", savedSessionId);
+            console.log("Temporary:", isTemp);
+
+            await loadSessionsHistory();
+
+            // =========================
+            // TEMPORARY CHAT
+            // =========================
+            if (isTemp) {
+                console.log("Temporary chat → clearing browser session");
+                sessionStorage.removeItem("sessionId");
+                currentSessionId = null;
+                return;
+            }
+
+            // =========================
+            // NORMAL CHAT RESTORE
+            // =========================
+            if (savedSessionId) {
+                currentSessionId = savedSessionId;
+                loadSessionMessages(savedSessionId);
+                setSidebarActive(savedSessionId);
+            }
+        })();
+
+        // ===============================
+        // TEMPORARY CHAT TOGGLE LOGIC
+        // ===============================
+        const toggleWrapper = document.getElementById("tempToggleWrapper");
+        const toggleSwitch = document.getElementById("tempToggle");
+
+        function initializeToggle() {
+            const isTemp = sessionStorage.getItem("temporaryChat") === "true";
+            isTemporaryChat = isTemp;
+
+            if (toggleSwitch) {
+                if (isTemp) {
+                    toggleSwitch.classList.add("active");
+                    if (toggleWrapper) toggleWrapper.title = "Turn off temporary chat";
+                } else {
+                    toggleSwitch.classList.remove("active");
+                    if (toggleWrapper) toggleWrapper.title = "Turn on temporary chat";
+                }
+            }
+            updateToggleVisibility();
+            setWelcomePhrase();
+        }
+
+        if (toggleWrapper) {
+            toggleWrapper.addEventListener("click", () => {
+                // When temporary chat has started, toggle is disabled (visible but not clickable)
+                if (isChatStarted && isTemporaryChat) return;
+
+                if (isChatStarted) return; // Normal chat: toggle is hidden; no-op if somehow focused
+
+                isTemporaryChat = !isTemporaryChat;
+                sessionStorage.setItem("temporaryChat", JSON.stringify(isTemporaryChat));
+                setWelcomePhrase();
+                // reset session when mode changes
+                currentSessionId = null;
+                sessionStorage.removeItem("sessionId");
+                if (isTemporaryChat) {
+                    toggleSwitch.classList.add("active");
+                    toggleWrapper.title = "Turn off temporary chat";
+                } else {
+                    toggleSwitch.classList.remove("active");
+                    toggleWrapper.title = "Turn on temporary chat";
+                }
+            });
+        }
+
+        initializeToggle();
+        setWelcomePhrase();
+
+        // =============================================================================
+        // Single emoji reaction per message (POST /chat/react, GET /chat/react/{id})
+        // =============================================================================
+        const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+
+        function setReactionDisplay(messageId, emoji) {
+            const container = document.getElementById(`reactions-${messageId}`);
+            if (!container) return;
+            const hasReact = emoji && emoji !== 'no_react';
+            container.innerHTML = (hasReact ? `<span class="reaction-emoji active" data-emoji="${emoji}">${emoji}</span>` : '') +
+                '<button class="add-reaction-btn" onclick="showEmojiPicker(' + messageId + ', this)" title="Add reaction">+</button>';
+            const idx = messageHistory.findIndex(m => m.messageId === messageId);
+            if (idx !== -1) messageHistory[idx].reactionEmoji = emoji;
+        }
+
+        function showEmojiPicker(messageId, button) {
+            const existingPicker = document.querySelector('.emoji-picker');
+            if (existingPicker) existingPicker.remove();
+
+            const picker = document.createElement('div');
+            picker.className = 'emoji-picker show';
+
+            REACTION_EMOJIS.forEach(emoji => {
+                const option = document.createElement('button');
+                option.className = 'emoji-option';
+                option.textContent = emoji;
+                option.onclick = () => {
+                    handleReactionClick(messageId, emoji);
+                    picker.remove();
+                };
+                picker.appendChild(option);
+            });
+            const clearBtn = document.createElement('button');
+            clearBtn.className = 'emoji-option';
+            clearBtn.textContent = '✕ Clear';
+            clearBtn.onclick = () => {
+                handleReactionClick(messageId, '');
+                picker.remove();
+            };
+            picker.appendChild(clearBtn);
+
+            const rect = button.getBoundingClientRect();
+            picker.style.position = 'fixed';
+            picker.style.left = (rect.left + 'px');
+            picker.style.top = (rect.bottom + 4 + 'px');
+            document.body.appendChild(picker);
+
+            setTimeout(() => {
+                document.addEventListener('click', function closePicker(e) {
+                    if (!picker.contains(e.target) && e.target !== button) {
+                        picker.remove();
+                        document.removeEventListener('click', closePicker);
+                    }
+                });
+            }, 0);
+        }
+
+        async function handleReactionClick(messageId, emoji) {
+            if (!messageId) return;
+            try {
+                const response = await fetch('/api/user/chat/react', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message_id: messageId, emoji: emoji || '' }),
+                    credentials: 'include'
+                });
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
+                    console.error('Reaction API error:', err.detail || response.status);
+                    return;
+                }
+                const data = await response.json();
+                const stored = (data.react && data.react !== 'no_react') ? data.react : 'no_react';
+                setReactionDisplay(messageId, stored);
+            } catch (error) {
+                console.error('Error saving reaction:', error);
+            }
+        }
+    </script>
+</body>
+
+</html>

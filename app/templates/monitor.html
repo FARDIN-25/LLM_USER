@@ -1,0 +1,658 @@
+<!-- Performance Monitoring Dashboard -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Performance Monitoring Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            color-scheme: light dark;
+            --bg: #0f172a;
+            --panel: rgba(15, 23, 42, 0.9);
+            --accent: #38bdf8;
+            --text: #e2e8f0;
+            --success: #22c55e;
+            --warning: #f97316;
+            --danger: #ef4444;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            background: radial-gradient(circle at top left, #1e40af, #0f172a);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        header {
+            padding: 24px 5vw;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        header h1 {
+            font-size: 1.8rem;
+            margin: 0;
+        }
+
+        header a {
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        main {
+            padding: 0 5vw 5vw;
+            display: grid;
+            gap: 24px;
+        }
+
+        .grid {
+            display: grid;
+            gap: 24px;
+        }
+
+        .grid.two {
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        }
+
+        .grid.three {
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        }
+
+        .panel {
+            background: var(--panel);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 18px 60px rgba(8, 47, 73, 0.35);
+            backdrop-filter: blur(12px);
+        }
+
+        .panel h2 {
+            margin: 0 0 12px;
+            font-size: 1.1rem;
+            letter-spacing: 0.04em;
+        }
+
+        .metrics-row {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .metric-card {
+            flex: 1;
+            min-width: 160px;
+            background: rgba(255,255,255,0.04);
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        .metric-card h3 {
+            margin: 0;
+            font-size: 0.85rem;
+            opacity: 0.7;
+            letter-spacing: 0.08em;
+        }
+
+        .metric-card p {
+            margin: 8px 0 0;
+            font-size: 1.8rem;
+            font-weight: 700;
+        }
+
+        .metric-card small {
+            display: block;
+            opacity: 0.6;
+            font-size: 0.75rem;
+            margin-top: 4px;
+        }
+
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+        }
+
+        .status::before {
+            content: "";
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--warning);
+        }
+
+        .status.healthy::before {
+            background: var(--success);
+        }
+
+        .status.degraded::before {
+            background: var(--warning);
+        }
+
+        .status.unavailable::before {
+            background: var(--danger);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+        }
+
+        th, td {
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            padding: 10px;
+            text-align: left;
+            font-size: 0.9rem;
+        }
+
+        th {
+            opacity: 0.6;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+        }
+
+        .token-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 999px;
+            background: rgba(56,189,248,0.15);
+            font-size: 0.75rem;
+            margin-right: 6px;
+        }
+
+        .chart-wrap {
+            position: relative;
+            width: 100%;
+            min-height: 240px;
+        }
+
+        footer {
+            text-align: center;
+            padding: 24px 0 40px;
+            opacity: 0.6;
+            font-size: 0.85rem;
+        }
+
+        @media (max-width: 768px) {
+            header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>📊 Performance Monitoring Dashboard</h1>
+        <a href="/">← Back to Assistant</a>
+    </header>
+
+    <main>
+        <section class="panel">
+            <h2>System Overview</h2>
+            <div class="metrics-row">
+                <div class="metric-card">
+                    <h3>CPU Usage</h3>
+                    <p id="cpuUsage">0%</p>
+                    <small>Real-time</small>
+                </div>
+                <div class="metric-card">
+                    <h3>Memory Usage</h3>
+                    <p id="memoryUsage">0%</p>
+                    <small id="memoryDetail">-</small>
+                </div>
+                <div class="metric-card">
+                    <h3>Disk Usage</h3>
+                    <p id="diskUsage">0%</p>
+                    <small id="diskDetail">-</small>
+                </div>
+                <div class="metric-card">
+                    <h3>Network</h3>
+                    <p id="networkUsage">0 kb/s</p>
+                    <small id="networkDetail">up / down</small>
+                </div>
+            </div>
+            <div id="systemStatus" class="status unavailable" style="margin-top:16px;">Collecting metrics...</div>
+        </section>
+
+        <section class="grid two">
+            <div class="panel">
+                <h2>CPU & Memory Trend</h2>
+                <div class="chart-wrap">
+                    <canvas id="cpuMemoryChart"></canvas>
+                </div>
+            </div>
+            <div class="panel">
+                <h2>Disk & Network Trend</h2>
+                <div class="chart-wrap">
+                    <canvas id="diskNetworkChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <section class="grid two">
+            <div class="panel">
+                <h2>Token Throughput</h2>
+                <div class="chart-wrap">
+                    <canvas id="tokenChart"></canvas>
+                </div>
+            </div>
+            <div class="panel">
+                <h2>Latency & Accuracy</h2>
+                <div class="chart-wrap">
+                    <canvas id="latencyChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <section class="grid two">
+            <div class="panel">
+                <h2>Performance Snapshot</h2>
+                <table>
+                    <tbody>
+                        <tr>
+                            <th>Total Responses</th>
+                            <td id="totalResponses">0</td>
+                        </tr>
+                        <tr>
+                            <th>Cache Hit Rate</th>
+                            <td id="cacheRate">0%</td>
+                        </tr>
+                        <tr>
+                            <th>Average Latency</th>
+                            <td id="avgLatency">0 ms</td>
+                        </tr>
+                        <tr>
+                            <th>Accuracy (context usage)</th>
+                            <td id="accuracyEstimate">0%</td>
+                        </tr>
+                        <tr>
+                            <th>Tokens (input / output)</th>
+                            <td>
+                                <span class="token-badge" id="promptTokens">0 in</span>
+                                <span class="token-badge" id="completionTokens">0 out</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Cache Size</th>
+                            <td id="cacheSize">0 entries</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="panel">
+                <h2>System Information</h2>
+                <table>
+                    <tbody>
+                        <tr><th>Platform</th><td id="systemPlatform">-</td></tr>
+                        <tr><th>Processor</th><td id="systemProcessor">-</td></tr>
+                        <tr><th>Logical / Physical Cores</th><td id="systemCores">-</td></tr>
+                        <tr><th>Memory</th><td id="systemMemory">-</td></tr>
+                        <tr><th>Disk</th><td id="systemDisk">-</td></tr>
+                        <tr><th>Uptime</th><td id="systemUptime">-</td></tr>
+                        <tr><th>Python</th><td id="pythonVersion">-</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <footer>Metrics refresh every 3 seconds · Charts show approximately last 5 minutes of history</footer>
+
+    <script>
+        const cpuMemoryCtx = document.getElementById('cpuMemoryChart');
+        const diskNetworkCtx = document.getElementById('diskNetworkChart');
+        const tokenCtx = document.getElementById('tokenChart');
+        const latencyCtx = document.getElementById('latencyChart');
+
+        const chartTheme = getComputedStyle(document.body);
+        const axisColor = 'rgba(226, 232, 240, 0.35)';
+        const gridColor = 'rgba(148, 163, 184, 0.08)';
+
+        const cpuMemoryChart = new Chart(cpuMemoryCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: 'CPU %',
+                        data: [],
+                        borderColor: '#38bdf8',
+                        tension: 0.35,
+                        fill: false,
+                    },
+                    {
+                        label: 'Memory %',
+                        data: [],
+                        borderColor: '#f59e0b',
+                        tension: 0.35,
+                        fill: false,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        ticks: { color: axisColor },
+                        grid: { color: gridColor }
+                    },
+                    y: {
+                        min: 0,
+                        max: 100,
+                        ticks: { color: axisColor, callback: value => value + '%' },
+                        grid: { color: gridColor }
+                    }
+                },
+                plugins: {
+                    legend: { labels: { color: axisColor } }
+                }
+            }
+        });
+
+        const diskNetworkChart = new Chart(diskNetworkCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: 'Disk %',
+                        data: [],
+                        borderColor: '#a855f7',
+                        tension: 0.35,
+                        fill: false,
+                    },
+                    {
+                        label: 'Upload KB/s',
+                        data: [],
+                        borderColor: '#22d3ee',
+                        tension: 0.35,
+                        fill: false,
+                    },
+                    {
+                        label: 'Download KB/s',
+                        data: [],
+                        borderColor: '#34d399',
+                        tension: 0.35,
+                        fill: false,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        ticks: { color: axisColor },
+                        grid: { color: gridColor }
+                    },
+                    y: {
+                        ticks: { color: axisColor },
+                        grid: { color: gridColor }
+                    }
+                },
+                plugins: {
+                    legend: { labels: { color: axisColor } }
+                }
+            }
+        });
+
+        const tokenChart = new Chart(tokenCtx, {
+            type: 'bar',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: 'Prompt Tokens',
+                        data: [],
+                        backgroundColor: 'rgba(56, 189, 248, 0.6)'
+                    },
+                    {
+                        label: 'Completion Tokens',
+                        data: [],
+                        backgroundColor: 'rgba(94, 234, 212, 0.6)'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        ticks: { color: axisColor },
+                        grid: { display: false }
+                    },
+                    y: {
+                        ticks: { color: axisColor },
+                        grid: { color: gridColor }
+                    }
+                },
+                plugins: {
+                    legend: { labels: { color: axisColor } }
+                }
+            }
+        });
+
+        const latencyChart = new Chart(latencyCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: 'Latency (ms)',
+                        data: [],
+                        borderColor: '#f472b6',
+                        tension: 0.35,
+                        fill: false,
+                    },
+                    {
+                        label: 'Accuracy Estimate',
+                        data: [],
+                        borderColor: '#4ade80',
+                        tension: 0.35,
+                        fill: false,
+                        yAxisID: 'y1'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        ticks: { color: axisColor },
+                        grid: { color: gridColor }
+                    },
+                    y: {
+                        ticks: { color: axisColor },
+                        grid: { color: gridColor }
+                    },
+                    y1: {
+                        position: 'right',
+                        min: 0,
+                        max: 1,
+                        ticks: { color: axisColor, callback: value => (value * 100).toFixed(0) + '%' },
+                        grid: { display: false }
+                    }
+                },
+                plugins: {
+                    legend: { labels: { color: axisColor } }
+                }
+            }
+        });
+
+        function formatTimeLabel(ts) {
+            try {
+                const d = new Date(ts);
+                return isNaN(d.getTime()) ? '' : d.toLocaleTimeString();
+            } catch (err) {
+                return '';
+            }
+        }
+
+        function formatPercent(value) {
+            return value.toFixed(1) + '%';
+        }
+
+        function formatLatency(ms) {
+            if (ms >= 1000) {
+                return (ms / 1000).toFixed(2) + ' s';
+            }
+            return (ms).toFixed(0) + ' ms';
+        }
+
+        function formatTokens(value) {
+            if (value >= 1000) {
+                return (value / 1000).toFixed(1) + 'k';
+            }
+            return value.toFixed(0);
+        }
+
+        async function refreshMetrics() {
+            try {
+                const [systemMetricsRes, systemInfoRes, performanceRes] = await Promise.all([
+                    fetch('/api/metrics/system'),
+                    fetch('/api/metrics/system-info'),
+                    fetch('/api/metrics/performance')
+                ]);
+
+                if (!systemMetricsRes.ok || !systemInfoRes.ok || !performanceRes.ok) {
+                    throw new Error('Unable to load metrics');
+                }
+
+                const systemMetrics = await systemMetricsRes.json();
+                const systemInfo = await systemInfoRes.json();
+                const performance = await performanceRes.json();
+
+                updateSystemOverview(systemMetrics, systemInfo);
+                updateCharts(systemMetrics, performance);
+                updatePerformanceSnapshot(performance, systemInfo);
+            } catch (error) {
+                document.getElementById('systemStatus').textContent = 'Monitoring offline: ' + error.message;
+                document.getElementById('systemStatus').className = 'status unavailable';
+            }
+        }
+
+        function updateSystemOverview(systemMetrics, systemInfo) {
+            const latest = systemMetrics.latest || {};
+
+            document.getElementById('cpuUsage').textContent = formatPercent(latest.cpu || 0);
+            document.getElementById('memoryUsage').textContent = formatPercent(latest.memory || 0);
+            document.getElementById('diskUsage').textContent = formatPercent(latest.disk || 0);
+
+            const upload = latest.network?.upload_kbps || 0;
+            const download = latest.network?.download_kbps || 0;
+            document.getElementById('networkUsage').textContent = `${upload.toFixed(1)} kb/s`;
+            document.getElementById('networkDetail').textContent = `up ${upload.toFixed(1)} · down ${download.toFixed(1)}`;
+
+            const statusElem = document.getElementById('systemStatus');
+            if (systemMetrics.psutil_available) {
+                statusElem.textContent = 'Real-time monitoring active';
+                statusElem.className = 'status healthy';
+            } else {
+                statusElem.textContent = 'psutil not installed - showing limited data';
+                statusElem.className = 'status degraded';
+            }
+
+            const memPercent = Number(systemInfo.memory_percent ?? 0);
+            const memPercentLabel = Number.isFinite(memPercent) ? memPercent.toFixed(1) + '%' : '-';
+            document.getElementById('memoryDetail').textContent = `${systemInfo.memory_used || '-'} of ${systemInfo.memory_total || '-'} (${memPercentLabel})`;
+
+            const diskPercent = Number(systemInfo.disk_percent ?? 0);
+            const diskPercentLabel = Number.isFinite(diskPercent) ? diskPercent.toFixed(1) + '%' : '-';
+            document.getElementById('diskDetail').textContent = `${systemInfo.disk_used || '-'} of ${systemInfo.disk_total || '-'} (${diskPercentLabel})`;
+        }
+
+        function updateCharts(systemMetrics, performance) {
+            const historyCpu = systemMetrics.history.cpu || [];
+            const historyMemory = systemMetrics.history.memory || [];
+            const historyDisk = systemMetrics.history.disk || [];
+            const historyNetwork = systemMetrics.history.network || [];
+
+            const labels = historyCpu.map(point => formatTimeLabel(point.ts));
+            cpuMemoryChart.data.labels = labels;
+            cpuMemoryChart.data.datasets[0].data = historyCpu.map(point => point.value || 0);
+            cpuMemoryChart.data.datasets[1].data = historyMemory.map(point => point.value || 0);
+            cpuMemoryChart.update('none');
+
+            diskNetworkChart.data.labels = historyDisk.map(point => formatTimeLabel(point.ts));
+            diskNetworkChart.data.datasets[0].data = historyDisk.map(point => point.value || 0);
+            diskNetworkChart.data.datasets[1].data = historyNetwork.map(point => (point.upload || 0) / 1024);
+            diskNetworkChart.data.datasets[2].data = historyNetwork.map(point => (point.download || 0) / 1024);
+            diskNetworkChart.update('none');
+
+            const tokenHistory = performance.token_history || [];
+            const tokenLabels = tokenHistory.map(point => formatTimeLabel(point.ts));
+            tokenChart.data.labels = tokenLabels;
+            tokenChart.data.datasets[0].data = tokenHistory.map(point => point.prompt_tokens || 0);
+            tokenChart.data.datasets[1].data = tokenHistory.map(point => point.completion_tokens || 0);
+            tokenChart.update('none');
+
+            const latencyHistory = performance.latency_history || [];
+            latencyChart.data.labels = latencyHistory.map(point => formatTimeLabel(point.ts));
+            latencyChart.data.datasets[0].data = latencyHistory.map(point => (point.duration || 0) * 1000);
+
+            const accuracyHistory = performance.accuracy_history || [];
+            const accuracyData = accuracyHistory.map(point => point.value || 0);
+            while (accuracyData.length < latencyChart.data.labels.length) {
+                accuracyData.push(accuracyData.length ? accuracyData[accuracyData.length - 1] : (performance.accuracy_estimate || 0));
+            }
+            latencyChart.data.datasets[1].data = accuracyData.slice(-latencyChart.data.labels.length);
+            latencyChart.update('none');
+        }
+
+        function updatePerformanceSnapshot(performance, systemInfo) {
+            const totalResponses = Number(performance?.requests_total ?? 0);
+            document.getElementById('totalResponses').textContent = totalResponses;
+
+            const rawCacheRate = performance?.cache_hit_rate;
+            let cacheRateValue = Number(rawCacheRate);
+            if (!Number.isFinite(cacheRateValue) && totalResponses > 0) {
+                const hits = Number(performance?.cache_hits ?? 0);
+                cacheRateValue = hits / totalResponses;
+            }
+            if (!Number.isFinite(cacheRateValue) || cacheRateValue < 0) {
+                cacheRateValue = 0;
+            }
+            const cacheRateDisplay = totalResponses === 0
+                ? '0%'
+                : (cacheRateValue * 100).toFixed(1) + '%';
+            document.getElementById('cacheRate').textContent = cacheRateDisplay;
+
+            const avgLatencySeconds = Number(performance?.average_latency ?? 0);
+            document.getElementById('avgLatency').textContent = formatLatency(avgLatencySeconds * 1000);
+
+            const accuracyEstimate = Number(performance?.accuracy_estimate ?? 0);
+            const accuracyDisplay = (Number.isFinite(accuracyEstimate) ? accuracyEstimate : 0) * 100;
+            document.getElementById('accuracyEstimate').textContent = accuracyDisplay.toFixed(1) + '%';
+
+            document.getElementById('promptTokens').textContent = `${formatTokens(performance.token_totals?.prompt || 0)} in`;
+            document.getElementById('completionTokens').textContent = `${formatTokens(performance.token_totals?.completion || 0)} out`;
+            document.getElementById('cacheSize').textContent = `${performance.cache_summary?.entries || 0} entries`;
+
+            document.getElementById('systemPlatform').textContent = `${systemInfo.platform || '-'} ${systemInfo.platform_release || ''}`;
+            document.getElementById('systemProcessor').textContent = systemInfo.processor || '-';
+            document.getElementById('systemCores').textContent = `${systemInfo.cpu_count_logical || '-'} logical / ${systemInfo.cpu_count_physical || '-'} physical`;
+            document.getElementById('systemMemory').textContent = `${systemInfo.memory_total || '-'} total`;
+            document.getElementById('systemDisk').textContent = `${systemInfo.disk_total || '-'} total`;
+            document.getElementById('systemUptime').textContent = systemInfo.uptime || '-';
+            document.getElementById('pythonVersion').textContent = systemInfo.python_version || '-';
+        }
+
+        refreshMetrics();
+        setInterval(refreshMetrics, 3000);
+    </script>
+</body>
+</html>
+
+

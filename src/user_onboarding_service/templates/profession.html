@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Profession</title>
+    <style>
+        body {
+            background: #0b1020;
+            color: white;
+            font-family: sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            width: 600px;
+            max-width: calc(100vw - 40px);
+        }
+
+        h2 {
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+
+        .option {
+            border: 1px solid #334155;
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 10px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .option.selected {
+            border-color: #3b82f6;
+            background: #1e293b;
+        }
+
+        button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>What is your profession or designation?</h2>
+
+    <div class="option" onclick="selectOption(this)">Auditor</div>
+    <div class="option" onclick="selectOption(this)">Tax Consultant</div>
+    <div class="option" onclick="selectOption(this)">Freelancer / Consultant</div>
+    <div class="option" onclick="selectOption(this)">Chartered Accountant (CA)</div>
+    <div class="option" onclick="selectOption(this)">Advocate / Lawyer</div>
+    <div class="option" onclick="selectOption(this)">Business Owner</div>
+    <div class="option" onclick="selectOption(this)">Startup Founder</div>
+    <div class="option" onclick="selectOption(this)">Others</div>
+
+    <button id="continueBtn" onclick="submitProfession()" disabled>Let’s go</button>
+</div>
+
+<script>
+let selected = null;
+
+function selectOption(el) {
+    document.querySelectorAll(".option").forEach(o => o.classList.remove("selected"));
+    el.classList.add("selected");
+    selected = el.innerText;
+
+    document.getElementById("continueBtn").disabled = false;
+}
+
+async function submitProfession() {
+    if (!selected) {
+        alert("Please select one option");
+        return;
+    }
+
+    const res = await fetch("/onboarding/profession", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            profession: selected
+        })
+    });
+
+    if (res.ok) {
+        window.location.href = "/chat";
+    } else {
+        alert("Something went wrong");
+    }
+}
+</script>
+
+</body>
+</html>
+

@@ -1,0 +1,1470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Monitoring Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Courier New', 'Consolas', monospace;
+            background: #0a0a0a;
+            color: #00ff00;
+            min-height: 100vh;
+            padding: 10px;
+            overflow-x: auto;
+        }
+        
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+        }
+        
+        .top-bar {
+            background: #1a1a1a;
+            border: 1px solid #00ff00;
+            padding: 8px 15px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .top-bar-left {
+            color: #00ff00;
+        }
+        
+        .top-bar-right {
+            color: #00ff00;
+        }
+        
+        .menu-bar {
+            background: #1a1a1a;
+            border: 1px solid #00ff00;
+            padding: 5px 10px;
+            margin-bottom: 10px;
+            display: flex;
+            gap: 20px;
+            font-size: 11px;
+        }
+        
+        .menu-bar a {
+            color: #00ff00;
+            text-decoration: none;
+            padding: 2px 8px;
+        }
+        
+        .menu-bar a:hover {
+            background: #00ff00;
+            color: #000;
+        }
+        
+        .main-panel {
+            background: #0a0a0a;
+            border: 1px solid #00ff00;
+            padding: 15px;
+            margin-bottom: 10px;
+        }
+        
+        .panel-header {
+            background: #1a1a1a;
+            border-bottom: 1px solid #00ff00;
+            padding: 8px 12px;
+            margin: -15px -15px 15px -15px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .sub-panel {
+            background: #0a0a0a;
+            border: 1px solid #00ff00;
+            padding: 12px;
+            font-size: 11px;
+        }
+        
+        .sub-panel-header {
+            background: #1a1a1a;
+            border-bottom: 1px solid #00ff00;
+            padding: 5px 10px;
+            margin: -12px -12px 10px -12px;
+            font-size: 11px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .metric-line {
+            padding: 4px 0;
+            border-bottom: 1px dotted #003300;
+            display: flex;
+            justify-content: space-between;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .metric-line:last-child {
+            border-bottom: none;
+        }
+        
+        .metric-label {
+            color: #00ff00;
+        }
+        
+        .metric-value {
+            color: #00ff00;
+            font-weight: bold;
+        }
+        
+        .metric-value.highlight {
+            color: #ffff00;
+        }
+        
+        .metric-value.error {
+            color: #ff0000;
+        }
+        
+        .code-block {
+            background: #000;
+            border: 1px solid #003300;
+            padding: 8px;
+            margin: 8px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 10px;
+            color: #00ff00;
+            overflow-x: auto;
+        }
+        
+        .code-line {
+            padding: 2px 0;
+        }
+        
+        .code-line.highlight {
+            background: #003300;
+            color: #00ff00;
+        }
+        
+        .toggle-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0;
+            border-bottom: 1px dotted #003300;
+        }
+        
+        .toggle-container:last-child {
+            border-bottom: none;
+        }
+        
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 20px;
+        }
+        
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #333;
+            border: 1px solid #00ff00;
+            transition: .3s;
+        }
+        
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 14px;
+            width: 14px;
+            left: 2px;
+            bottom: 2px;
+            background-color: #000;
+            border: 1px solid #00ff00;
+            transition: .3s;
+        }
+        
+        input:checked + .toggle-slider {
+            background-color: #00ff00;
+        }
+        
+        input:checked + .toggle-slider:before {
+            transform: translateX(20px);
+            background-color: #000;
+        }
+        
+        .log-container {
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 10px;
+            background: #000;
+            border: 1px solid #003300;
+            padding: 8px;
+        }
+        
+        .log-item {
+            padding: 6px;
+            margin-bottom: 6px;
+            border-left: 2px solid #00ff00;
+            background: #0a0a0a;
+            font-size: 10px;
+        }
+        
+        .log-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+            color: #00ff00;
+            font-weight: bold;
+        }
+        
+        .log-content {
+            color: #00ff00;
+            font-size: 9px;
+        }
+        
+        .session-item {
+            border-left-color: #8b5cf6;
+            transition: all 0.3s ease;
+        }
+        
+        .session-item.active {
+            border-left-color: #00ff00;
+            background: rgba(0, 255, 0, 0.1);
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+            animation: pulse-active 2s ease-in-out infinite;
+        }
+        
+        @keyframes pulse-active {
+            0%, 100% {
+                box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+                border-left-color: #00ff00;
+            }
+            50% {
+                box-shadow: 0 0 20px rgba(0, 255, 0, 0.6);
+                border-left-color: #00ffff;
+            }
+        }
+        
+        .session-item.active .log-header {
+            color: #00ff00;
+        }
+        
+        .session-item.active .log-header::before {
+            content: "● ";
+            color: #00ff00;
+            animation: blink-active 1s ease-in-out infinite;
+        }
+        
+        @keyframes blink-active {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.3;
+            }
+        }
+        
+        .memory-item {
+            border-left-color: #00ffff;
+            background: #0a0a1a;
+            border-left-width: 3px;
+        }
+        
+        .memory-item.expanded {
+            background: #0a0a2a;
+            border-left-color: #00ff00;
+        }
+        
+        .memory-item:hover {
+            background: #0a0a2a;
+        }
+        
+        .read-more-btn {
+            color: #00ffff;
+            cursor: pointer;
+            text-decoration: underline;
+            font-size: 9px;
+            margin-top: 6px;
+            display: inline-block;
+            padding: 2px 6px;
+            background: #003333;
+            border: 1px solid #00ffff;
+        }
+        
+        .read-more-btn:hover {
+            color: #00ff00;
+            background: #003300;
+            border-color: #00ff00;
+        }
+        
+        .token-detail {
+            color: #00ffff;
+            font-size: 9px;
+            margin-top: 4px;
+        }
+        
+        .source-badge {
+            display: inline-block;
+            background: #003300;
+            border: 1px solid #00ff00;
+            padding: 2px 6px;
+            margin: 2px;
+            font-size: 8px;
+            color: #00ff00;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 200px;
+            margin-top: 10px;
+            background: #000;
+            border: 1px solid #003300;
+            padding: 5px;
+        }
+        
+        .data-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin-top: 10px;
+        }
+        
+        .grid-item {
+            background: #000;
+            border: 1px solid #003300;
+            padding: 6px;
+            text-align: center;
+        }
+        
+        .grid-label {
+            color: #00ff00;
+            font-size: 9px;
+            margin-bottom: 4px;
+        }
+        
+        .grid-value {
+            color: #00ff00;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .bottom-bar {
+            background: #1a1a1a;
+            border: 1px solid #00ff00;
+            padding: 8px 15px;
+            margin-top: 10px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            color: #00ff00;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #00ff00;
+            margin-right: 5px;
+            box-shadow: 0 0 5px #00ff00;
+        }
+        
+        .status-indicator.inactive {
+            background: #ff0000;
+            box-shadow: 0 0 5px #ff0000;
+        }
+        
+        /* Service Status Cards - Single Row Layout */
+        .services-status-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+        
+        .service-card {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.9);
+            border: 1px solid #00ff00;
+            padding: 12px 15px;
+            min-width: 0;
+            box-shadow: 0 2px 10px rgba(0,255,0,0.3);
+        }
+        
+        .service-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+        }
+        
+        .service-card-title {
+            font-weight: bold;
+            font-size: 12px;
+            color: #00ff00;
+            margin-bottom: 5px;
+        }
+        
+        .service-card-status {
+            font-size: 11px;
+            color: #00ff00;
+        }
+        
+        .service-card-toggle {
+            color: #00ff00;
+            font-size: 14px;
+            margin-left: 10px;
+            transition: transform 0.2s;
+        }
+        
+        .service-card-toggle.expanded {
+            transform: rotate(180deg);
+        }
+        
+        .service-card-endpoints {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #00ff00;
+            display: none;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .service-card-endpoints.expanded {
+            display: block;
+        }
+        
+        .endpoint-item {
+            padding: 6px 8px;
+            margin-bottom: 5px;
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-left: 2px solid #00ff00;
+            padding-left: 10px;
+        }
+        
+        .endpoint-method {
+            font-weight: bold;
+            color: #00ff00;
+            min-width: 45px;
+        }
+        
+        .endpoint-path {
+            color: #00ff00;
+            flex: 1;
+        }
+        
+        .endpoint-status-badge {
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 9px;
+            font-weight: bold;
+        }
+        
+        .endpoint-status-badge.running {
+            background: rgba(0, 255, 0, 0.2);
+            color: #00ff00;
+            border: 1px solid #00ff00;
+        }
+        
+        .endpoint-status-badge.error {
+            background: rgba(255, 0, 0, 0.2);
+            color: #ff0000;
+            border: 1px solid #ff0000;
+        }
+        
+        .status-healthy {
+            color: #00ff00;
+        }
+        
+        .status-degraded {
+            color: #ffff00;
+        }
+        
+        .status-offline {
+            color: #ff0000;
+        }
+        
+        .endpoint-status-bar {
+            background: rgba(0, 0, 0, 0.9);
+            color: #00ff00;
+            padding: 8px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 2px 10px rgba(0,255,0,0.3);
+            border-bottom: 1px solid #00ff00;
+            font-size: 11px;
+        }
+        
+        .endpoint-status-bar .status-label {
+            font-weight: bold;
+            margin-right: 10px;
+            color: #00ff00;
+        }
+        
+        .endpoint-status-bar .endpoints-list {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .endpoint-status-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 10px;
+            padding: 6px 10px;
+            border-radius: 4px;
+            background: transparent;
+            border: 1px solid #00ff00;
+            color: #00ff00;
+            font-weight: bold;
+            cursor: default;
+            min-width: 100px;
+            justify-content: center;
+        }
+        
+        .endpoint-status-item.online,
+        .endpoint-status-item.available {
+            border-color: #00ff00;
+            color: #00ff00;
+            box-shadow: 0 0 5px rgba(0,255,0,0.3);
+        }
+        
+        .endpoint-status-item.degraded {
+            border-color: #ffff00;
+            color: #ffff00;
+            box-shadow: 0 0 5px rgba(255,255,0,0.3);
+        }
+        
+        .endpoint-status-item.offline,
+        .endpoint-status-item.error,
+        .endpoint-status-item.timeout {
+            border-color: #ff0000;
+            color: #ff0000;
+            box-shadow: 0 0 5px rgba(255,0,0,0.3);
+        }
+        
+        .endpoint-status-item.unknown {
+            border-color: #808080;
+            color: #808080;
+        }
+        
+        .endpoint-status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        
+        .endpoint-status-dot.online,
+        .endpoint-status-dot.available {
+            background: #00ff00;
+            box-shadow: 0 0 3px #00ff00;
+        }
+        
+        .endpoint-status-dot.degraded {
+            background: #ffff00;
+            box-shadow: 0 0 3px #ffff00;
+        }
+        
+        .endpoint-status-dot.offline,
+        .endpoint-status-dot.error,
+        .endpoint-status-dot.timeout {
+            background: #ff0000;
+            box-shadow: 0 0 3px #ff0000;
+        }
+        
+        .endpoint-status-dot.unknown {
+            background: #808080;
+        }
+        
+        .endpoint-status-summary {
+            font-size: 10px;
+            color: #00ff00;
+        }
+    </style>
+</head>
+<body>
+    <!-- Services Status Row - Single Row Layout -->
+    <div class="services-status-row">
+        <!-- User Service Card -->
+        <div class="service-card">
+            <div class="service-card-header" onclick="toggleServiceDropdown('user', event)">
+                <div>
+                    <div class="service-card-title">User Service – Status</div>
+                    <div class="service-card-status" id="userServiceStatus">LOADING...</div>
+                </div>
+                <span class="service-card-toggle" id="userServiceToggle">▼</span>
+            </div>
+            <div class="service-card-endpoints" id="userServiceEndpoints">
+                <div class="endpoint-status-summary">LOADING...</div>
+            </div>
+        </div>
+        
+        <!-- Cleaning Service Card -->
+        <div class="service-card">
+            <div class="service-card-header" onclick="toggleServiceDropdown('cleaning', event)">
+                <div>
+                    <div class="service-card-title">Cleaning Service – Status</div>
+                    <div class="service-card-status" id="cleaningServiceStatus">LOADING...</div>
+                </div>
+                <span class="service-card-toggle" id="cleaningServiceToggle">▼</span>
+            </div>
+            <div class="service-card-endpoints" id="cleaningServiceEndpoints">
+                <div class="endpoint-status-summary">LOADING...</div>
+            </div>
+        </div>
+        
+        <!-- Ingestion Service Card -->
+        <div class="service-card">
+            <div class="service-card-header" onclick="toggleServiceDropdown('ingestion', event)">
+                <div>
+                    <div class="service-card-title">Ingestion Service – Status</div>
+                    <div class="service-card-status" id="ingestionServiceStatus">LOADING...</div>
+                </div>
+                <span class="service-card-toggle" id="ingestionServiceToggle">▼</span>
+            </div>
+            <div class="service-card-endpoints" id="ingestionServiceEndpoints">
+                <div class="endpoint-status-summary">LOADING...</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Back Button -->
+    <div style="margin-bottom: 10px; text-align: right;">
+        <a href="/" style="color: #00ff00; text-decoration: none; padding: 4px 10px; border: 1px solid #00ff00; border-radius: 3px; font-size: 10px; font-weight: bold;">← BACK</a>
+    </div>
+    <div class="container" style="padding: 20px;">
+        <!-- Session ID Tracking -->
+        <div class="main-panel">
+            <div class="panel-header">
+                <span>1. SESSION ID TRACKING</span>
+            </div>
+            <div class="log-container" id="sessionContainer">
+                <div class="code-line">Loading sessions...</div>
+            </div>
+        </div>
+        
+        <!-- Token Usage & Resources -->
+        <div class="grid">
+            <div class="sub-panel">
+                <div class="sub-panel-header">
+                    <span>2. TOKEN USAGE (LLM/MODEL)</span>
+                    <span>FILE ID</span>
+                </div>
+                <div class="metric-line">
+                    <span class="metric-label">TTFT:</span>
+                    <span class="metric-value" id="ttft">0 ms</span>
+                </div>
+                <div class="metric-line">
+                    <span class="metric-label">TOTAL TOKENS:</span>
+                    <span class="metric-value" id="totalTokens">0</span>
+                </div>
+                <div class="metric-line">
+                    <span class="metric-label">PROMPT TOKENS:</span>
+                    <span class="metric-value" id="promptTokens">0</span>
+                </div>
+                <div class="metric-line">
+                    <span class="metric-label">COMPLETION TOKENS:</span>
+                    <span class="metric-value" id="completionTokens">0</span>
+                </div>
+                <div class="metric-line">
+                    <span class="metric-label">TOKENS/SEC:</span>
+                    <span class="metric-value" id="tokensPerSecond">0</span>
+                </div>
+                <div class="metric-line">
+                    <span class="metric-label">REPLY TIME:</span>
+                    <span class="metric-value" id="avgReplyTime">0 ms</span>
+                </div>
+                <div class="code-block" id="tokenDetails" style="margin-top: 10px; max-height: 150px; overflow-y: auto;">
+                    <div class="code-line">Loading token details...</div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="tokenChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="sub-panel">
+                <div class="sub-panel-header">
+                    <span>3. RESOURCES (KB/CSV/197x → MODEL)</span>
+                    <span>DATA.SET 001</span>
+                </div>
+                <div class="metric-line">
+                    <span class="metric-label">TOTAL CHUNKS:</span>
+                    <span class="metric-value" id="totalChunks">0</span>
+                </div>
+                <div class="metric-line">
+                    <span class="metric-label">TOTAL FILES:</span>
+                    <span class="metric-value" id="totalFiles">0</span>
+                </div>
+                <div class="metric-line">
+                    <span class="metric-label">FILE TYPES:</span>
+                    <span class="metric-value" id="fileTypes">-</span>
+                </div>
+            </div>
+            
+            <div class="sub-panel">
+                <div class="sub-panel-header">
+                    <span>USAGE STATISTICS</span>
+                    <span>PERCENTAGE</span>
+                </div>
+                <div class="metric-line">
+                    <span class="metric-label">KB DATA USAGE:</span>
+                    <span class="metric-value" id="kbUsagePercentage">0%</span>
+                </div>
+                <div class="metric-line">
+                    <span class="metric-label">LLM USAGE:</span>
+                    <span class="metric-value" id="llmUsagePercentage">0%</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- RAG Settings -->
+        <div class="main-panel">
+            <div class="panel-header">
+                <span>4. RAG SETTINGS</span>
+                <span>CONFIG</span>
+            </div>
+            <div class="code-block">
+                <div class="toggle-container">
+                    <div>
+                        <div class="code-line highlight">RAG ON/OFF</div>
+                        <div class="code-line" style="font-size: 9px; color: #888;">Enable/disable RAG pipeline</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="ragEnabled" onchange="updateRAGSettings()">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="toggle-container">
+                    <div>
+                        <div class="code-line highlight">QUERY EXPANSION</div>
+                        <div class="code-line" style="font-size: 9px; color: #888;">Add section numbers, synonyms</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="queryExpansionEnabled" onchange="updateRAGSettings()">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="toggle-container">
+                    <div>
+                        <div class="code-line highlight">RERANKING</div>
+                        <div class="code-line" style="font-size: 9px; color: #888;">Re-rank chunks by relevance</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="rerankingEnabled" onchange="updateRAGSettings()">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="toggle-container">
+                    <div>
+                        <div class="code-line highlight">HYBRID RETRIEVAL</div>
+                        <div class="code-line" style="font-size: 9px; color: #888;">Dense + Sparse search</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="hybridRetrievalEnabled" onchange="updateRAGSettings()">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Memory Function -->
+        <div class="main-panel">
+            <div class="panel-header">
+                <span>5. MEMORY FUNCTION</span>
+                <span>RAM_START</span>
+            </div>
+            <div class="log-container" id="memoryContainer">
+                <div class="code-line">Loading memory...</div>
+            </div>
+        </div>
+        
+        <!-- Model Settings -->
+        <div class="main-panel">
+            <div class="panel-header">
+                <span>6. MODEL SETTINGS</span>
+                <span>CONFIG</span>
+            </div>
+            <div class="code-block">
+                <div class="toggle-container">
+                    <div>
+                        <div class="code-line highlight">MISTRAL</div>
+                        <div class="code-line" style="font-size: 9px; color: #888;" id="mistralStatus">Disconnected</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="mistralEnabled" onchange="updateModelSettings()">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bottom-bar">
+            <div>
+                <span class="status-indicator"></span>
+                REAL-TIME MONITORING ACTIVE | AUTO-REFRESH: 3s
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Session ID management
+        function generateSessionId() {
+            const date = new Date();
+            const dateStr = date.getDate().toString().padStart(2, '0') + 
+                          (date.getMonth() + 1).toString().padStart(2, '0') + 
+                          date.getFullYear();
+            const shortUuid = Math.random().toString(36).substring(2, 10);
+            return `${dateStr}-${shortUuid}`;
+        }
+        
+        let sessionId = localStorage.getItem("session_id");
+        if (!sessionId) {
+            sessionId = generateSessionId();
+            localStorage.setItem("session_id", sessionId);
+        }
+        
+        // Initialize token chart with dark theme
+        const tokenCtx = document.getElementById('tokenChart');
+        const tokenChart = new Chart(tokenCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'TOKENS',
+                    data: [],
+                    borderColor: '#00ff00',
+                    backgroundColor: 'rgba(0, 255, 0, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        labels: { color: '#00ff00', font: { family: 'Courier New', size: 10 } }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: { color: '#00ff00', font: { family: 'Courier New', size: 9 } },
+                        grid: { color: '#003300' }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: { color: '#00ff00', font: { family: 'Courier New', size: 9 } },
+                        grid: { color: '#003300' }
+                    }
+                }
+            }
+        });
+        
+        async function refreshMetrics() {
+            try {
+                const [metricsRes, resourcesRes, sessionsRes, memoryRes] = await Promise.all([
+                    fetch('/api/monitoring/metrics'),
+                    fetch('/api/monitoring/resources'),
+                    fetch('/api/monitoring/sessions'),
+                    fetch('/api/monitoring/memory')
+                ]);
+                
+                if (!metricsRes.ok) {
+                    throw new Error('Failed to fetch metrics');
+                }
+                
+                const metrics = await metricsRes.json();
+                const resources = resourcesRes.ok ? await resourcesRes.json() : {};
+                const sessions = sessionsRes.ok ? await sessionsRes.json() : (metrics.active_sessions || {});
+                
+                // Get memory from database (persists across server restarts)
+                const memoryData = memoryRes.ok ? await memoryRes.json() : (metrics.memory || []);
+                window.currentMemoryData = memoryData;
+                
+                updateSessions(sessions);
+                updateTokenUsage(metrics);
+                updateResources(resources);
+                updateUsageStatistics(metrics);
+                updateRAGSettingsUI(metrics.rag_settings || {});
+                updateMemory(memoryData);
+                updateModelSettingsUI(metrics.model_settings || {});
+                
+            } catch (error) {
+                console.error('Error refreshing metrics:', error);
+            }
+        }
+        
+        function updateSessions(sessions) {
+            const container = document.getElementById('sessionContainer');
+            const sessionKeys = Object.keys(sessions);
+            
+            if (sessionKeys.length === 0) {
+                container.innerHTML = '<div class="code-line">No active sessions</div>';
+                return;
+            }
+            
+            // Find the most recently active session (current active session)
+            let activeSessionId = null;
+            let mostRecentTime = 0;
+            
+            sessionKeys.forEach(sessionId => {
+                const session = sessions[sessionId];
+                const lastActivity = session.last_activity_at || session.last_activity;
+                if (lastActivity) {
+                    const lastActivityDate = new Date(lastActivity + 'Z');
+                    const timestamp = lastActivityDate.getTime();
+                    if (timestamp > mostRecentTime) {
+                        mostRecentTime = timestamp;
+                        activeSessionId = sessionId;
+                    }
+                }
+            });
+            
+            // Sort sessions: active session first, then by last activity (most recent first)
+            const sortedSessionKeys = sessionKeys.sort((a, b) => {
+                // Active session always comes first
+                if (a === activeSessionId) return -1;
+                if (b === activeSessionId) return 1;
+                
+                // Otherwise sort by last activity (most recent first)
+                const sessionA = sessions[a];
+                const sessionB = sessions[b];
+                const lastActivityA = sessionA.last_activity_at || sessionA.last_activity;
+                const lastActivityB = sessionB.last_activity_at || sessionB.last_activity;
+                
+                if (lastActivityA && lastActivityB) {
+                    const timeA = new Date(lastActivityA + 'Z').getTime();
+                    const timeB = new Date(lastActivityB + 'Z').getTime();
+                    return timeB - timeA; // Most recent first
+                }
+                return 0;
+            });
+            
+            container.innerHTML = sortedSessionKeys.map(sessionId => {
+                const session = sessions[sessionId];
+                const createdDate = new Date(session.created_at + 'Z');
+                const lastActivity = session.last_activity_at || session.last_activity;
+                const lastActivityDate = new Date(lastActivity + 'Z');
+                const createdStr = createdDate.toLocaleString('en-US', { 
+                    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                    year: 'numeric', month: '2-digit', day: '2-digit',
+                    hour: '2-digit', minute: '2-digit', second: '2-digit'
+                });
+                const lastStr = lastActivityDate.toLocaleString('en-US', { 
+                    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                    year: 'numeric', month: '2-digit', day: '2-digit',
+                    hour: '2-digit', minute: '2-digit', second: '2-digit'
+                });
+                const isActive = sessionId === activeSessionId;
+                const activeClass = isActive ? ' active' : '';
+                return `
+                    <div class="log-item session-item${activeClass}">
+                        <div class="log-header">
+                            <span>SESSION: ${sessionId || 'UNKNOWN'}</span>
+                            <span>QUERIES: ${session.query_count || 0}</span>
+                        </div>
+                        <div class="log-content">
+                            CREATED: ${createdStr}<br>
+                            LAST: ${lastStr}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function updateTokenUsage(metrics) {
+            const performance = metrics.performance || {};
+            const tokenHistory = performance.token_history || [];
+            
+            let totalPromptTokens = 0;
+            let totalCompletionTokens = 0;
+            let totalTokens = 0;
+            let latestModel = 'N/A';
+            let latestPromptTokens = 0;
+            let latestCompletionTokens = 0;
+            let latestTTFT = null;
+            let latestSources = [];
+            
+            const recentRequests = metrics.recent_requests || [];
+            if (recentRequests.length > 0) {
+                const latestRequest = recentRequests[recentRequests.length - 1];
+                latestSources = latestRequest.source_names || [];
+                if (latestRequest.llm_model) {
+                    latestModel = latestRequest.llm_model;
+                }
+                if (latestRequest.prompt_tokens !== undefined) {
+                    latestPromptTokens = latestRequest.prompt_tokens;
+                }
+                if (latestRequest.completion_tokens !== undefined) {
+                    latestCompletionTokens = latestRequest.completion_tokens;
+                }
+                if (latestRequest.ttft_ms !== undefined && latestRequest.ttft_ms !== null) {
+                    latestTTFT = latestRequest.ttft_ms;
+                }
+            }
+            
+            if (tokenHistory.length > 0) {
+                tokenHistory.forEach(item => {
+                    totalPromptTokens += (item.prompt_tokens || 0);
+                    totalCompletionTokens += (item.completion_tokens || 0);
+                });
+                totalTokens = totalPromptTokens + totalCompletionTokens;
+                
+                if (latestModel === 'N/A') {
+                    const latest = tokenHistory[tokenHistory.length - 1];
+                    latestModel = latest.llm_model || 'N/A';
+                }
+                if (latestPromptTokens === 0 && latestCompletionTokens === 0) {
+                    const latest = tokenHistory[tokenHistory.length - 1];
+                    latestPromptTokens = latest.prompt_tokens || 0;
+                    latestCompletionTokens = latest.completion_tokens || 0;
+                }
+            }
+            
+            const tokensPerSecond = (performance.tokens_per_second || 0).toFixed(2);
+            const avgLatency = (performance.average_latency_ms || 0).toFixed(0);
+            const avgTTFT = (performance.average_ttft_ms || 0).toFixed(0);
+            
+            const ttftDisplay = latestTTFT !== null ? latestTTFT : (avgTTFT > 0 ? parseFloat(avgTTFT) : null);
+            if (ttftDisplay !== null) {
+                document.getElementById('ttft').textContent = Math.round(ttftDisplay).toLocaleString() + ' ms';
+            } else {
+                document.getElementById('ttft').textContent = 'N/A';
+            }
+            
+            document.getElementById('totalTokens').textContent = totalTokens.toLocaleString();
+            document.getElementById('promptTokens').textContent = totalPromptTokens.toLocaleString();
+            document.getElementById('completionTokens').textContent = totalCompletionTokens.toLocaleString();
+            document.getElementById('tokensPerSecond').textContent = tokensPerSecond + ' tok/s';
+            document.getElementById('avgReplyTime').textContent = avgLatency + ' ms';
+            
+            const tokenDetailsContainer = document.getElementById('tokenDetails');
+            const modelDisplay = latestModel && latestModel !== 'N/A' ? latestModel : 'N/A';
+            tokenDetailsContainer.innerHTML = `
+                <div class="code-line highlight">LATEST REQUEST:</div>
+                <div class="code-line">MODEL: <span style="color: #00ff00;">${modelDisplay}</span></div>
+                <div class="code-line">PROMPT TOKENS: <span style="color: #00ff00;">${latestPromptTokens}</span></div>
+                <div class="code-line">COMPLETION TOKENS: <span style="color: #00ff00;">${latestCompletionTokens}</span></div>
+                <div class="code-line">TOTAL TOKENS: <span style="color: #00ff00;">${latestPromptTokens + latestCompletionTokens}</span></div>
+                ${latestModel && latestModel !== 'N/A' ? `
+                    <div class="code-line highlight" style="margin-top: 8px;">LLM MODEL TOKEN USAGE:</div>
+                    <div class="code-line" style="font-size: 9px;">Model: ${latestModel}</div>
+                    <div class="code-line" style="font-size: 9px;">Prompt: ${latestPromptTokens} tokens</div>
+                    <div class="code-line" style="font-size: 9px;">Completion: ${latestCompletionTokens} tokens</div>
+                    <div class="code-line" style="font-size: 9px;">Total: ${latestPromptTokens + latestCompletionTokens} tokens</div>
+                ` : ''}
+                ${latestSources.length > 0 ? `
+                    <div class="code-line highlight" style="margin-top: 8px;">KB SOURCES:</div>
+                    ${latestSources.map(src => `<span class="source-badge">${src}</span>`).join('')}
+                ` : '<div class="code-line">KB SOURCES: N/A</div>'}
+            `;
+            
+            const labels = tokenHistory.slice(-20).map((item, idx) => {
+                const date = new Date(item.timestamp + 'Z');
+                return date.toLocaleTimeString('en-US', { 
+                    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                    hour: '2-digit', minute: '2-digit', second: '2-digit'
+                });
+            });
+            const tokenData = tokenHistory.slice(-20).map(item => 
+                (item.prompt_tokens || 0) + (item.completion_tokens || 0)
+            );
+            
+            tokenChart.data.labels = labels;
+            tokenChart.data.datasets[0].data = tokenData;
+            tokenChart.update('none');
+        }
+        
+        function updateResources(resources) {
+            document.getElementById('totalChunks').textContent = (resources.total_chunks || 0).toLocaleString();
+            document.getElementById('totalFiles').textContent = (resources.total_files || 0).toLocaleString();
+            
+            const fileTypes = resources.file_types || {};
+            const fileTypesStr = Object.keys(fileTypes).length > 0 
+                ? Object.entries(fileTypes).map(([type, count]) => `${type}: ${count}`).join(', ')
+                : 'N/A';
+            document.getElementById('fileTypes').textContent = fileTypesStr;
+        }
+        
+        function updateUsageStatistics(metrics) {
+            const usageStats = metrics.usage_statistics || {};
+            const performance = metrics.performance || {};
+            
+            // Use the same percentages from backend (calculated with history page logic)
+            // Backend already applies scaling: LLM 98.1-99.9%, KB 0.1-1.9%
+            const kbPercent = (usageStats.kb_usage_percentage || 0).toFixed(2);
+            const llmPercent = (usageStats.llm_usage_percentage || 0).toFixed(2);
+            
+            document.getElementById('kbUsagePercentage').textContent = kbPercent + '%';
+            document.getElementById('llmUsagePercentage').textContent = llmPercent + '%';
+        }
+        
+        function updateRAGSettingsUI(settings) {
+            document.getElementById('ragEnabled').checked = settings.rag_enabled || false;
+            document.getElementById('queryExpansionEnabled').checked = settings.query_expansion_enabled || false;
+            document.getElementById('rerankingEnabled').checked = settings.reranking_enabled || false;
+            document.getElementById('hybridRetrievalEnabled').checked = settings.hybrid_retrieval_enabled || false;
+        }
+        
+        async function updateRAGSettings() {
+            const ragEnabled = document.getElementById('ragEnabled').checked;
+            const queryExpansionEnabled = document.getElementById('queryExpansionEnabled').checked;
+            const rerankingEnabled = document.getElementById('rerankingEnabled').checked;
+            const hybridRetrievalEnabled = document.getElementById('hybridRetrievalEnabled').checked;
+            
+            try {
+                const response = await fetch('/api/monitoring/rag-settings', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        rag_enabled: ragEnabled,
+                        query_expansion_enabled: queryExpansionEnabled,
+                        reranking_enabled: rerankingEnabled,
+                        hybrid_retrieval_enabled: hybridRetrievalEnabled
+                    })
+                });
+                if (response.ok) {
+                    console.log('RAG settings updated');
+                }
+            } catch (error) {
+                console.error('Error updating RAG settings:', error);
+            }
+        }
+        
+        function updateMemory(memory) {
+            const container = document.getElementById('memoryContainer');
+            
+            if (memory.length === 0) {
+                container.innerHTML = '<div class="code-line">Memory is empty</div>';
+                return;
+            }
+            
+            const reversedMemory = memory.slice().reverse();
+            container.innerHTML = reversedMemory.slice(0, 20).map((item, index) => {
+                const date = new Date(item.timestamp + 'Z');
+                const dateStr = date.toLocaleString('en-US', { 
+                    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                    year: 'numeric', month: '2-digit', day: '2-digit',
+                    hour: '2-digit', minute: '2-digit', second: '2-digit'
+                });
+                const itemId = `memory-${index}`;
+                const response = item.response || '';
+                const shortResponse = response.length > 150 ? response.substring(0, 150) + '...' : response;
+                const sessionId = item.session_id || 'N/A';
+                
+                return `
+                    <div class="log-item memory-item" id="${itemId}">
+                        <div class="log-header">
+                            <span>SESSION: ${sessionId}</span>
+                            <span>${dateStr}</span>
+                        </div>
+                        <div class="log-content">
+                            <div class="code-line highlight" style="color: #00ffff;">Q:</div>
+                            <div class="code-line" style="color: #00ff00;">${escapeHtml(item.query || 'N/A')}</div>
+                            <div class="code-line highlight" style="margin-top: 6px; color: #00ffff;">A:</div>
+                            <div class="code-line" id="${itemId}-response" style="color: #00ff00; white-space: pre-wrap; word-wrap: break-word;">${escapeHtml(shortResponse)}</div>
+                            ${response.length > 150 ? `
+                                <span class="read-more-btn" onclick="toggleMemoryExpand('${itemId}', ${index})" id="${itemId}-btn" style="display: inline-block; cursor: pointer;">READ MORE</span>
+                            ` : ''}
+                            ${item.llm_model ? `<div class="token-detail" style="color: #00ffff;">MODEL: <span style="color: #00ff00;">${item.llm_model}</span></div>` : ''}
+                            ${item.prompt_tokens || item.completion_tokens ? `
+                                <div class="token-detail" style="color: #00ffff;">
+                                    TOKENS: <span style="color: #00ff00;">${item.prompt_tokens || 0}</span> prompt / <span style="color: #00ff00;">${item.completion_tokens || 0}</span> completion
+                                </div>
+                            ` : ''}
+                            ${item.source_names && item.source_names.length > 0 ? `
+                                <div class="token-detail" style="margin-top: 4px; color: #00ffff;">
+                                    KB SOURCES: ${item.source_names.map(src => `<span class="source-badge">${src}</span>`).join('')}
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function toggleMemoryExpand(itemId, index) {
+            const item = document.getElementById(itemId);
+            const responseDiv = document.getElementById(itemId + '-response');
+            const btn = document.getElementById(itemId + '-btn');
+            
+            if (!item || !responseDiv) return;
+            
+            const isExpanded = item.classList.contains('expanded');
+            const memoryData = window.currentMemoryData || [];
+            const reversedMemory = memoryData.slice().reverse();
+            const memoryItem = reversedMemory[index];
+            
+            if (memoryItem && memoryItem.response) {
+                if (isExpanded) {
+                    const shortResponse = memoryItem.response.length > 150 
+                        ? memoryItem.response.substring(0, 150) + '...' 
+                        : memoryItem.response;
+                    responseDiv.innerHTML = escapeHtml(shortResponse);
+                    if (btn) {
+                        btn.textContent = 'READ MORE';
+                        btn.style.display = memoryItem.response.length > 150 ? 'inline-block' : 'none';
+                    }
+                    item.classList.remove('expanded');
+                } else {
+                    // Expand: show full answer with proper formatting
+                    responseDiv.style.whiteSpace = 'pre-wrap';
+                    responseDiv.style.wordWrap = 'break-word';
+                    responseDiv.innerHTML = escapeHtml(memoryItem.response);
+                    if (btn) {
+                        btn.textContent = 'READ LESS';
+                        btn.style.display = 'inline-block';
+                    }
+                    item.classList.add('expanded');
+                    setTimeout(() => {
+                        item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }, 100);
+                }
+            }
+        }
+        
+        function updateMistralStatus(enabled) {
+            const statusElement = document.getElementById('mistralStatus');
+            if (enabled) {
+                statusElement.textContent = 'Connected';
+                statusElement.style.color = '#00ff00';
+            } else {
+                statusElement.textContent = 'Disconnected';
+                statusElement.style.color = '#ff0000';
+            }
+        }
+        
+        function updateModelSettingsUI(settings) {
+            const mistralEnabled = settings.mistral_enabled || false;
+            document.getElementById('mistralEnabled').checked = mistralEnabled;
+            updateMistralStatus(mistralEnabled);
+        }
+        
+        async function updateModelSettings() {
+            const mistralEnabled = document.getElementById('mistralEnabled').checked;
+            
+            // Update status immediately
+            updateMistralStatus(mistralEnabled);
+            
+            try {
+                const response = await fetch('/api/monitoring/model-settings', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        mistral_enabled: mistralEnabled
+                    })
+                });
+                if (response.ok) {
+                    console.log('Model settings updated');
+                }
+            } catch (error) {
+                console.error('Error updating model settings:', error);
+                // Revert status on error
+                updateMistralStatus(!mistralEnabled);
+                document.getElementById('mistralEnabled').checked = !mistralEnabled;
+            }
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Initial load
+        refreshMetrics();
+        
+        // Auto-refresh every 3 seconds
+        setInterval(refreshMetrics, 3000);
+
+        // Endpoint Status Checking
+        // Dropdown state management
+        const serviceDropdowns = {
+            user: false,
+            cleaning: false,
+            ingestion: false
+        };
+        
+        function toggleServiceDropdown(serviceName, event) {
+            if (event) {
+                event.stopPropagation();
+                event.preventDefault();
+            }
+            
+            // Toggle only the clicked service - get current state from DOM
+            const endpointsDiv = document.getElementById(`${serviceName}ServiceEndpoints`);
+            const toggleIcon = document.getElementById(`${serviceName}ServiceToggle`);
+            
+            if (!endpointsDiv || !toggleIcon) return;
+            
+            // Check current state from DOM, not from serviceDropdowns object
+            const isCurrentlyExpanded = endpointsDiv.classList.contains('expanded');
+            
+            // Toggle the state
+            if (isCurrentlyExpanded) {
+                // Collapse this service
+                endpointsDiv.classList.remove('expanded');
+                toggleIcon.classList.remove('expanded');
+                serviceDropdowns[serviceName] = false;
+            } else {
+                // Expand this service
+                endpointsDiv.classList.add('expanded');
+                toggleIcon.classList.add('expanded');
+                serviceDropdowns[serviceName] = true;
+            }
+        }
+        
+        async function updateEndpointStatus() {
+            try {
+                const response = await fetch('/api/endpoints-status');
+                if (!response.ok) {
+                    throw new Error('Failed to fetch endpoint status');
+                }
+                const data = await response.json();
+                
+                // Update User Service
+                updateServiceCard('user', data.services?.user);
+                
+                // Update Cleaning Service
+                updateServiceCard('cleaning', data.services?.cleaning);
+                
+                // Update Ingestion Service
+                updateServiceCard('ingestion', data.services?.ingestion);
+                
+            } catch (error) {
+                console.error('Error updating endpoint status:', error);
+                // Set error state for all services
+                updateServiceCard('user', null, 'STATUS CHECK FAILED');
+                updateServiceCard('cleaning', null, 'STATUS CHECK FAILED');
+                updateServiceCard('ingestion', null, 'STATUS CHECK FAILED');
+            }
+        }
+        
+        function updateServiceCard(serviceName, serviceData, errorMessage = null) {
+            const statusElement = document.getElementById(`${serviceName}ServiceStatus`);
+            const endpointsElement = document.getElementById(`${serviceName}ServiceEndpoints`);
+            
+            if (!statusElement || !endpointsElement) return;
+            
+            // Preserve the current dropdown state
+            const wasExpanded = endpointsElement.classList.contains('expanded');
+            
+            if (errorMessage) {
+                statusElement.textContent = errorMessage;
+                statusElement.className = 'service-card-status status-offline';
+                endpointsElement.innerHTML = '<div class="endpoint-status-summary">ERROR</div>';
+                // Restore dropdown state
+                if (wasExpanded) {
+                    endpointsElement.classList.add('expanded');
+                } else {
+                    endpointsElement.classList.remove('expanded');
+                }
+                return;
+            }
+            
+            if (!serviceData || !serviceData.endpoints) {
+                statusElement.textContent = 'NO DATA';
+                statusElement.className = 'service-card-status status-offline';
+                endpointsElement.innerHTML = '<div class="endpoint-status-summary">NO DATA</div>';
+                // Restore dropdown state
+                if (wasExpanded) {
+                    endpointsElement.classList.add('expanded');
+                } else {
+                    endpointsElement.classList.remove('expanded');
+                }
+                return;
+            }
+            
+            // Update status display
+            const onlineCount = serviceData.online_count || 0;
+            const totalCount = serviceData.total_count || 0;
+            const overallStatus = serviceData.status || 'unknown';
+            
+            let statusText = `${onlineCount}/${totalCount} `;
+            let statusClass = 'service-card-status ';
+            
+            if (overallStatus === 'healthy') {
+                statusText += '(ONLINE) HEALTHY';
+                statusClass += 'status-healthy';
+            } else if (overallStatus === 'degraded') {
+                statusText += '(ONLINE) DEGRADED';
+                statusClass += 'status-degraded';
+            } else {
+                statusText += '(OFFLINE) DOWN';
+                statusClass += 'status-offline';
+            }
+            
+            statusElement.textContent = statusText;
+            statusElement.className = statusClass;
+            
+            // Update endpoints list
+            let endpointsHtml = '';
+            serviceData.endpoints.forEach(endpoint => {
+                const isRunning = endpoint.running || endpoint.status === 'online' || endpoint.status === 'available';
+                const statusBadge = isRunning ? 'RUNNING' : 'ERROR';
+                const statusClass = isRunning ? 'running' : 'error';
+                
+                endpointsHtml += `
+                    <div class="endpoint-item" title="${endpoint.path} - ${endpoint.method}${endpoint.response_time_ms ? ' - ' + endpoint.response_time_ms + 'ms' : ''}${endpoint.error ? ' - ' + endpoint.error : ''}">
+                        <span class="endpoint-method">${endpoint.method}</span>
+                        <span class="endpoint-path">${endpoint.path}</span>
+                        <span class="endpoint-status-badge ${statusClass}">${statusBadge}</span>
+                    </div>
+                `;
+            });
+            
+            endpointsElement.innerHTML = endpointsHtml || '<div class="endpoint-status-summary">NO ENDPOINTS</div>';
+            
+            // Restore dropdown state after updating content
+            if (wasExpanded) {
+                endpointsElement.classList.add('expanded');
+            } else {
+                endpointsElement.classList.remove('expanded');
+            }
+        }
+
+        // Update endpoint status on load and every 30 seconds
+        updateEndpointStatus();
+        setInterval(updateEndpointStatus, 30000);
+    </script>
+</body>
+</html>

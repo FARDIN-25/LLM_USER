@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>FinTax - Welcome</title>
+
+    <style>
+        body {
+            margin: 0;
+            background: #0b0f19;
+            color: #e5e7eb;
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .container {
+            width: 500px;
+        }
+
+        .icon {
+            font-size: 30px;
+            color: #f97316;
+            margin-bottom: 20px;
+        }
+
+        h2 {
+            font-weight: 400;
+            margin-bottom: 25px;
+        }
+
+        .input-box {
+            display: flex;
+            align-items: center;
+            background: #111827;
+            border: 2px solid #3b82f6;
+            border-radius: 16px;
+            padding: 10px;
+            transition: 0.3s;
+        }
+
+        .input-box:focus-within {
+            border-color: #60a5fa;
+            box-shadow: 0 0 10px rgba(96,165,250,0.3);
+        }
+
+        input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: white;
+            font-size: 16px;
+            outline: none;
+        }
+
+        .btn {
+            background: #e5e7eb;
+            color: black;
+            border: none;
+            border-radius: 12px;
+            padding: 8px 14px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .btn:hover {
+            background: white;
+        }
+
+        .sub {
+            margin-top: 15px;
+            font-size: 13px;
+            color: #9ca3af;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+    <div class="icon"></div>
+
+    <h2>Before we begin your tax assistance, what should I call you?</h2>
+
+    <div class="input-box">
+        <input type="text" id="nameInput" placeholder="Enter your name" />
+        <button class="btn" onclick="submitDetails()">→</button>
+    </div>
+
+    <div class="sub">
+        Your name helps personalize your tax assistant experience.
+    </div>
+</div>
+
+<script>
+function submitDetails() {
+    const name = document.getElementById("nameInput").value;
+
+    if (!name) {
+        alert("Enter your name");
+        return;
+    }
+
+    fetch("/onboarding/user-details", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            full_name: name
+        })
+    })
+    .then(res => res.json())
+    .then(() => {
+        window.location.href = "/onboarding/interests";
+    });
+}
+
+</script>
+
+</body>
+</html>

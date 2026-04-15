@@ -1,0 +1,43 @@
+
+--- Testing Query: 'who is bhaaskar' ---
+Detected Template: definition
+Category: GENERAL
+Rewritten: Who is Bhaaskar?
+
+--- Testing Query: 'who is suguna' ---
+Detected Template: definition
+Category: GENERAL
+Rewritten: Who is Suguna?
+
+--- Testing Query: 'What is the GST rate for services?' ---
+Detected Template: computation
+Category: GST
+Rewritten: What are the applicable GST rates for services under the Goods and Services Tax (GST) regime in India?
+
+--- Testing Query: 'GST who is suguna' ---
+Detected Template: definition
+Category: GENERAL
+Rewritten: ```json
+{
+  "intent": "identity_check_with_domain_prefix",
+  "entity": "Suguna",
+  "rewritten_query": "Who is Suguna in the context of GST?",
+  "retrieval_query": "Suguna person identity profile background expertise GST related",
+  "keywords": ["Suguna", "GST", "identity", "profile", "expertise"],
+  "category": "GENERAL"
+}
+```
+
+**Correction Note:**
+Upon closer inspection of the **CRITICAL INSTRUCTIONS**, the correct output should **strictly isolate the entity** (Suguna) and avoid polluting the retrieval query with GST-related terms unless explicitly required. Here’s the corrected version:
+
+```json
+{
+  "intent": "identity_check",
+  "entity": "Suguna",
+  "rewritten_query": "Who is Suguna?",
+  "retrieval_query": "Suguna person identity profile background expertise",
+  "keywords": ["Suguna"],
+  "category": "GENERAL"
+}
+```

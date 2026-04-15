@@ -1,0 +1,2097 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tax Assistant - GST & Tax Help</title>
+`    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .monitor-link {
+            display: inline-block;
+            margin-top: 18px;
+            padding: 10px 22px;
+            border-radius: 999px;
+            border: 2px solid rgba(255,255,255,0.5);
+            color: white;
+            text-decoration: none;
+            font-weight: 600;
+            transition: background 0.3s ease, transform 0.3s ease;
+        }
+
+        .monitor-link:hover {
+            background: rgba(255,255,255,0.2);
+            transform: translateY(-2px);
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: transform 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .card h2 {
+            color: #333;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        
+        .status-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .status-card h2 {
+            color: white;
+            border-bottom-color: rgba(255,255,255,0.3);
+        }
+        
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .status-item:last-child {
+            border-bottom: none;
+        }
+        
+        .status-value {
+            font-weight: bold;
+        }
+        
+        .healthy {
+            color: #90EE90;
+        }
+        
+        .degraded {
+            color: #FFB347;
+        }
+        
+        .unavailable {
+            color: #FF6B6B;
+        }
+        
+        textarea {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            font-size: 16px;
+            resize: vertical;
+            min-height: 100px;
+            transition: border-color 0.3s ease;
+            font-family: inherit;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .response-area {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #667eea;
+            font-style: italic;
+        }
+        
+        .error {
+            background: #ffe6e6;
+            border-left-color: #ff6b6b;
+            color: #d63031;
+        }
+        
+        .chunk {
+            background: white;
+            border: 1px solid #e1e5e9;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .chunk-meta {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 10px;
+            border-top: 1px solid #eee;
+            padding-top: 10px;
+        }
+        
+        .system-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .info-item {
+            text-align: center;
+            padding: 15px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+        }
+        
+        .answer-content {
+            line-height: 1.6;
+            white-space: pre-wrap;
+            font-family: inherit;
+            text-decoration: none;
+        }
+        
+        .answer-content * {
+            text-decoration: none !important;
+        }
+        
+        .answer-content h3, .answer-content h4 {
+            margin: 15px 0 10px 0;
+            color: #333;
+            text-decoration: none;
+        }
+        
+        .answer-content ul, .answer-content ol {
+            margin: 10px 0 10px 20px;
+        }
+        
+        .answer-content li {
+            margin: 8px 0;
+        }
+        
+        .answer-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        
+        .answer-content th, .answer-content td {
+            border: 1px solid #ddd;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        
+        .answer-content th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        
+        .answer-content tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+
+        .chat-controls {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 10px;
+            align-items: start;
+        }
+
+        /* Upload & Train Knowledge Base Styles */
+        .upload-train-section {
+            margin-top: 20px;
+        }
+
+        .upload-train-section h2 {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #333;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .upload-train-section h2::before {
+            content: "📁";
+            font-size: 1.2em;
+        }
+
+        .upload-instructions {
+            color: #666;
+            margin-bottom: 20px;
+            font-size: 0.95em;
+        }
+
+        .upload-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+
+        .btn-select {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        }
+
+        .btn-upload-train {
+            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+        }
+
+        .btn-clear {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        }
+
+        .btn-select::before {
+            content: "📄 ";
+        }
+
+        .btn-upload-train::before {
+            content: "🚀 ";
+        }
+
+        .btn-clear::before {
+            content: "🗑️ ";
+        }
+
+        .selected-files-section {
+            margin-top: 20px;
+        }
+
+        .selected-files-header {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .file-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .file-item-train {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e1e5e9;
+            margin-bottom: 8px;
+        }
+
+        .file-item-info {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+        }
+
+        .file-item-name {
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 4px;
+        }
+
+        .file-item-size {
+            font-size: 0.85em;
+            color: #666;
+            margin-bottom: 4px;
+        }
+
+        .file-item-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 4px;
+        }
+
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75em;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-badge.queued {
+            background: #0d6efd;
+            color: #ffffff;
+        }
+
+        .status-badge.uploading {
+            background: #ffc107;
+            color: #000000;
+        }
+
+        .status-badge.processing {
+            background: #0dcaf0;
+            color: #000000;
+        }
+
+        .status-badge.success {
+            background: #198754;
+            color: #ffffff;
+        }
+
+        .status-badge.failed {
+            background: #dc3545;
+            color: #ffffff;
+        }
+
+        .status-badge.cancelled {
+            background: #6c757d;
+            color: #ffffff;
+        }
+
+        .file-progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #e1e5e9;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 8px;
+            position: relative;
+        }
+
+        .file-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #0dcaf0 0%, #0d6efd 100%);
+            transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.75em;
+            font-weight: bold;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+            min-width: 40px; /* Ensure text is always visible */
+            padding: 0 6px;
+            box-sizing: border-box;
+            animation: progressPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes progressPulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.9;
+            }
+        }
+
+        .file-progress-fill.success {
+            background: linear-gradient(90deg, #198754 0%, #20c997 100%);
+        }
+
+        .file-item-message {
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 6px;
+            padding: 4px 8px;
+            background: #f0f0f0;
+            border-radius: 4px;
+            word-wrap: break-word;
+        }
+
+        .file-item-message.success {
+            color: #198754;
+            background: #d1e7dd;
+            font-weight: 500;
+        }
+
+        .file-item-error {
+            font-size: 0.85em;
+            color: #dc3545;
+            margin-top: 6px;
+            padding: 4px 8px;
+            background: #fff5f5;
+            border-left: 3px solid #dc3545;
+            border-radius: 3px;
+            word-wrap: break-word;
+        }
+
+        .file-item-actions {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+
+        .file-item-remove, .file-item-cancel, .file-item-retry {
+            background: #dc3545;
+            color: white;
+            border: none;
+            min-width: 30px;
+            height: 30px;
+            padding: 0 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            font-weight: bold;
+            line-height: 1;
+        }
+
+        .file-item-remove:hover, .file-item-cancel:hover, .file-item-retry:hover {
+            transform: scale(1.1);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .file-item-cancel {
+            background: #ffc107;
+            color: #000;
+        }
+
+        .file-item-cancel:hover {
+            background: #e0a800;
+            color: #000;
+        }
+
+        .file-item-retry {
+            background: #28a745;
+            color: white;
+        }
+
+        .file-item-retry:hover {
+            background: #218838;
+            color: white;
+        }
+
+        .file-item-remove {
+            background: #dc3545;
+            color: white;
+        }
+
+        .file-item-remove:hover {
+            background: #c82333;
+            color: white;
+        }
+
+        .upload-status {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            display: none;
+        }
+
+        .upload-status.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            display: block;
+        }
+
+        .upload-status.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            display: block;
+        }
+
+        .upload-status.loading {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+            display: block;
+        }
+
+        .queue-status {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e1e5e9;
+        }
+
+        .queue-status-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #e1e5e9;
+        }
+
+        .btn-refresh {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 5px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .btn-refresh:hover {
+            background: #5568d3;
+        }
+
+        .queue-status-content {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+
+        .queue-stat-item {
+            text-align: center;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+            border: 1px solid #e1e5e9;
+        }
+
+        .queue-stat-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .queue-stat-label {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .storage-status {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e1e5e9;
+        }
+
+        .storage-status-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #e1e5e9;
+        }
+
+        .storage-progress-bar {
+            width: 100%;
+            height: 25px;
+            background: #e9ecef;
+            border-radius: 12px;
+            overflow: hidden;
+            margin: 10px 0;
+            position: relative;
+        }
+
+        .storage-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #28a745 0%, #ffc107 80%, #dc3545 95%);
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.75em;
+            font-weight: bold;
+        }
+
+        .storage-progress-fill.warning {
+            background: linear-gradient(90deg, #ffc107 0%, #dc3545 95%);
+        }
+
+        .storage-progress-fill.critical {
+            background: #dc3545;
+        }
+
+        .storage-info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .storage-info-item {
+            text-align: center;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+            border: 1px solid #e1e5e9;
+        }
+
+        .storage-info-value {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .storage-info-label {
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        /* Query History Styles */
+        .query-history-item {
+            background: #f8f9fa;
+            border: 1px solid #e1e5e9;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .query-history-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .query-history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e1e5e9;
+        }
+
+        .query-history-question {
+            flex: 1;
+            font-weight: 600;
+            color: #333;
+            font-size: 1.1em;
+            margin-right: 15px;
+        }
+
+        .query-history-timestamp {
+            font-size: 0.85em;
+            color: #666;
+            white-space: nowrap;
+        }
+
+        .query-history-answer {
+            margin: 15px 0;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            line-height: 1.6;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .query-contributions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        @media (max-width: 768px) {
+            .query-contributions {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .contribution-card {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            border: 2px solid #e1e5e9;
+        }
+
+        .contribution-card.kb {
+            border-color: #28a745;
+        }
+
+        .contribution-card.llm {
+            border-color: #667eea;
+        }
+
+        .contribution-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .contribution-percentage {
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+
+        .contribution-percentage.kb {
+            color: #28a745;
+        }
+
+        .contribution-percentage.llm {
+            color: #667eea;
+        }
+
+        .contribution-details {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 10px;
+        }
+
+        .contribution-details-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .contribution-details-item:last-child {
+            border-bottom: none;
+        }
+
+        .contribution-label {
+            color: #666;
+        }
+
+        .contribution-value {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .query-history-empty {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧾 Tax Assistant</h1>
+            <p>AI-powered GST and Tax Consultation</p>
+            <a class="monitor-link" href="/monitor" target="_blank" rel="noopener">Open Performance Dashboard ↗</a>
+        </div>
+        
+        <div class="dashboard">
+            <div class="card status-card">
+                <h2>System Status</h2>
+                <div id="statusContent">
+                    <div class="loading">Checking system status...</div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>💬 Chat with Tax Assistant</h2>
+                <textarea id="chatQuestion" placeholder="Ask any GST or tax-related question..."></textarea>
+
+                <div class="chat-controls">
+                    <button onclick="sendChat()">Get Answer</button>
+                </div>
+                <div id="chatResponse" class="response-area"></div>
+            </div>
+        </div>
+
+        <!-- Upload & Train Knowledge Base Section -->
+        <div class="card upload-train-section">
+            <h2>Upload & Train Knowledge Base</h2>
+            <hr style="margin-bottom: 15px; border: none; border-top: 1px solid #e1e5e9;">
+            <p class="upload-instructions" id="uploadInstructions">
+                Upload multiple files (PDF, TXT, DOCX, CSV, XLSX) to train your knowledge base.
+                <br><strong>Limits:</strong> Loading...
+            </p>
+            <div id="storageStatus" class="storage-status">
+                <div class="storage-status-header">
+                    <strong>💾 Storage Status</strong>
+                    <button onclick="refreshStorageStatus()" class="btn-refresh">🔄 Refresh</button>
+                </div>
+                <div id="storageStatusContent">
+                    <div class="loading">Loading storage status...</div>
+                </div>
+            </div>
+            
+            <div id="queueStatus" class="queue-status" style="display: none;">
+                <div class="queue-status-header">
+                    <strong>📊 Queue Status</strong>
+                    <button onclick="refreshQueueStatus()" class="btn-refresh">🔄 Refresh</button>
+                </div>
+                <div id="queueStatusContent" class="queue-status-content"></div>
+            </div>
+            
+            <div class="upload-buttons">
+                <button class="btn-select" onclick="selectFiles()">Select Files</button>
+                <button class="btn-upload-train" onclick="uploadAndTrain()" id="uploadTrainBtn">Upload & Train</button>
+                <button class="btn-clear" onclick="clearFiles()">Clear</button>
+            </div>
+
+            <input type="file" id="knowledgeBaseFiles" accept=".pdf,.txt,.docx,.csv,.xlsx,.xls,.md" multiple style="display: none;">
+
+            <div class="selected-files-section">
+                <div class="selected-files-header" id="selectedFilesHeader" style="display: none;">
+                    Selected Files (<span id="fileCount">0</span>):
+                </div>
+                <div class="file-list" id="selectedFilesList"></div>
+            </div>
+
+            <div class="upload-status" id="uploadStatus"></div>
+        </div>
+        
+        <div class="system-info">
+            <div class="info-item">
+                <strong>Vector Store</strong>
+                <div id="vectorStatus" class="unavailable">Checking...</div>
+            </div>
+            <div class="info-item">
+                <strong>Query Expansion</strong>
+                <div id="expansionStatus" class="unavailable">Checking...</div>
+            </div>
+            <div class="info-item">
+                <strong>Reranking</strong>
+                <div id="rerankStatus" class="unavailable">Checking...</div>
+            </div>
+            <div class="info-item">
+                <strong>LLM API</strong>
+                <div id="llmStatus" class="unavailable">Checking...</div>
+            </div>
+        </div>
+
+        <!-- Query History Button -->
+        <div class="card" style="margin-top: 20px; text-align: center;">
+            <!-- Fixed: navigate to namespaced History UI under /api/user/ui/history -->
+            <a href="/api/user/ui/history" class="btn-upload-train" style="text-decoration: none; padding: 12px 24px; font-size: 1em; display: inline-block;">
+                🚀 View Full History
+            </a>
+        </div>
+    </div>
+
+    <script>
+        // Helper function to fetch with timeout
+        async function fetchWithTimeout(url, options = {}, timeout = 5000) {
+            const controller = new AbortController();
+            const id = setTimeout(() => controller.abort(), timeout);
+            
+            try {
+                const response = await fetch(url, {
+                    ...options,
+                    signal: controller.signal
+                });
+                clearTimeout(id);
+                return response;
+            } catch (error) {
+                clearTimeout(id);
+                if (error.name === 'AbortError') {
+                    throw new Error('Request timeout');
+                }
+                throw error;
+            }
+        }
+
+        // Check system health on page load
+        async function checkHealth() {
+            const statusContent = document.getElementById('statusContent');
+            if (!statusContent) return;
+            
+            try {
+                const response = await fetchWithTimeout('/api/user/health', {}, 5000);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                const data = await response.json();
+                
+                updateStatusDisplay(data);
+            } catch (error) {
+                console.error('Health check error:', error);
+                statusContent.innerHTML = `
+                    <div class="status-item">
+                        <span>Overall Status:</span>
+                        <span class="status-value unavailable">❌ Connection Error</span>
+                    </div>
+                    <div class="status-item">
+                        <span>Vector Store:</span>
+                        <span class="status-value unavailable">❌ Unavailable</span>
+                    </div>
+                    <div class="status-item">
+                        <span>LangChain:</span>
+                        <span class="status-value unavailable">❌ Unavailable</span>
+                    </div>
+                    <div class="error" style="margin-top: 10px;">Cannot connect to server: ${error.message}</div>
+                `;
+                
+                // Update individual status indicators with error state
+                const vectorStatus = document.getElementById('vectorStatus');
+                const expansionStatus = document.getElementById('expansionStatus');
+                const rerankStatus = document.getElementById('rerankStatus');
+                const llmStatus = document.getElementById('llmStatus');
+                
+                if (vectorStatus) {
+                    vectorStatus.textContent = '❌ Unavailable';
+                    vectorStatus.className = 'unavailable';
+                }
+                if (expansionStatus) {
+                    expansionStatus.textContent = '❌ Unavailable';
+                    expansionStatus.className = 'unavailable';
+                }
+                if (rerankStatus) {
+                    rerankStatus.textContent = '❌ Unavailable';
+                    rerankStatus.className = 'unavailable';
+                }
+                if (llmStatus) {
+                    llmStatus.textContent = '❌ Unavailable';
+                    llmStatus.className = 'unavailable';
+                }
+            }
+        }
+        
+        function updateStatusDisplay(data) {
+            const statusContent = document.getElementById('statusContent');
+            const statusClass = data.status === 'healthy' ? 'healthy' : 'degraded';
+            
+            statusContent.innerHTML = `
+                <div class="status-item">
+                    <span>Overall Status:</span>
+                    <span class="status-value ${statusClass}">${data.status === 'healthy' ? '✅ Healthy' : '⚠️ Degraded'}</span>
+                </div>
+                <div class="status-item">
+                    <span>Vector Store:</span>
+                    <span class="status-value ${data.vectorstore_initialized ? 'healthy' : 'degraded'}">
+                        ${data.vectorstore_initialized ? '✅ Available' : '❌ Unavailable'}
+                    </span>
+                </div>
+                <div class="status-item">
+                    <span>LangChain:</span>
+                    <span class="status-value ${data.langchain_available ? 'healthy' : 'unavailable'}">
+                        ${data.langchain_available ? '✅ Available' : '❌ Unavailable'}
+                    </span>
+                </div>
+            `;
+            
+            // Update individual status indicators
+            document.getElementById('vectorStatus').textContent = data.vectorstore_initialized ? '✅ Available' : '❌ Unavailable';
+            document.getElementById('vectorStatus').className = data.vectorstore_initialized ? 'healthy' : 'unavailable';
+            
+            document.getElementById('expansionStatus').textContent = data.query_expansion_available ? '✅ Available' : '❌ Unavailable';
+            document.getElementById('expansionStatus').className = data.query_expansion_available ? 'healthy' : 'unavailable';
+            
+            document.getElementById('rerankStatus').textContent = data.reranking_available ? '✅ Available' : '❌ Unavailable';
+            document.getElementById('rerankStatus').className = data.reranking_available ? 'healthy' : 'unavailable';
+            
+            document.getElementById('llmStatus').textContent = '✅ Ready';
+            document.getElementById('llmStatus').className = 'healthy';
+        }
+        
+        async function sendChat() {
+            const question = document.getElementById('chatQuestion').value.trim();
+            const responseDiv = document.getElementById('chatResponse');
+            
+            if (!question) {
+                responseDiv.innerHTML = '<div class="error">Please enter a question</div>';
+                return;
+            }
+            
+            responseDiv.innerHTML = '<div class="loading">Thinking...</div>';
+            
+            try {
+                const response = await fetch('/api/user/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        question
+                    })
+                });
+                
+                // Get response as text first
+                const text = await response.text();
+                
+                // Parse JSON with error handling
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch (parseError) {
+                    throw new Error("Server returned invalid JSON");
+                }
+                
+                // Check for error status
+                if (data.status === "error") {
+                    alert(data.message);
+                    responseDiv.innerHTML = `<div class="error"><strong>Error:</strong> ${data.message}</div>`;
+                    return;
+                }
+                
+                // Handle success response
+                if (data.status === "success") {
+                    let html = '';
+                    
+                    // Use answer field (new format) or reply field (backward compatibility)
+                    const answerText = data.answer || data.reply || '';
+                    
+                    html += `<strong>Answer:</strong><br><div class="answer-content">${formatAnswer(answerText)}</div>`;
+                    
+                    // Show context info if available
+                    if (data.context_used === false) {
+                        html += `<br><small><em>Note: Answer generated from general knowledge (context unavailable)</em></small>`;
+                    } else if (data.chunks && data.chunks.length > 0) {
+                        html += `<br><small><em>Answer based on ${data.chunks.length} document chunk(s) from knowledge base</em></small>`;
+                    }
+
+                    // If backend returns contribution percentages, display them (do not recompute relevance)
+                    try {
+                        const kbRaw = data.kb_contribution?.percentage ?? data.kb_percentage ?? null;
+                        const llmRaw = data.llm_contribution?.percentage ?? data.llm_percentage ?? null;
+                        if (kbRaw !== null || llmRaw !== null) {
+                            // Normalize minor rounding so displayed values sum to 100
+                            let kb = kbRaw !== null ? Number(kbRaw) : null;
+                            let llm = llmRaw !== null ? Number(llmRaw) : null;
+                            if (kb === null && llm !== null) kb = Math.max(0, 100 - llm);
+                            if (llm === null && kb !== null) llm = Math.max(0, 100 - kb);
+                            kb = Math.round(kb * 10) / 10;
+                            llm = Math.round(llm * 10) / 10;
+                            if (Math.round((kb + llm) * 10) / 10 !== 100) {
+                                llm = Math.max(0, Math.round((100 - kb) * 10) / 10);
+                            }
+
+                            html += `<br><div style="margin-top:8px; font-size:0.95em; color:#444">` +
+                                `<strong>Contributions:</strong> KB ${kb.toFixed(1)}% — LLM ${llm.toFixed(1)}%</div>`;
+                        }
+                    } catch (e) {
+                        console.warn('Error showing contribution percentages', e);
+                    }
+                    
+                    responseDiv.innerHTML = html;
+                    // Scroll to bottom to show full answer
+                    responseDiv.scrollTop = responseDiv.scrollHeight;
+                } else {
+                    // Fallback for old format or unexpected format
+                    if (data.error) {
+                        alert(data.error);
+                        responseDiv.innerHTML = `<div class="error"><strong>Error:</strong> ${data.error}</div>`;
+                    } else if (data.reply) {
+                        // Backward compatibility with old format
+                        let html = `<strong>Answer:</strong><br><div class="answer-content">${formatAnswer(data.reply)}</div>`;
+                        if (!data.context_used) {
+                            html += `<br><small><em>Note: Answer generated from general knowledge (context unavailable)</em></small>`;
+                        }
+                        responseDiv.innerHTML = html;
+                        responseDiv.scrollTop = responseDiv.scrollHeight;
+                    } else {
+                        throw new Error("Unexpected response format");
+                    }
+                }
+            } catch (error) {
+                const errorMsg = error.message || "Unknown error occurred";
+                alert(errorMsg);
+                responseDiv.innerHTML = `<div class="error"><strong>Network Error:</strong> ${errorMsg}</div>`;
+            }
+        }
+        
+        function formatAnswer(text) {
+            // Enhanced formatting for better readability - keep it clean and simple
+            return text
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                // Remove emojis and symbols that might cause issues
+                .replace(/[✅🔹📘⚡💰💡🧾🧮📊📩📗❓]/g, '')
+                // Remove any markdown-style links that might cause underlines
+                .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
+                // Convert newlines to line breaks (do this after other replacements)
+                .replace(/\n/g, '<br>')
+                // Clean up multiple spaces but preserve line breaks
+                .replace(/[ \t]+/g, ' ')
+                .trim();
+        }
+        
+        // Allow Enter key to send messages (with Shift+Enter for new line)
+        document.getElementById('chatQuestion').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendChat();
+            }
+        });
+        
+        // Initial health check
+        checkHealth();
+        
+        // Refresh health status every 30 seconds
+        setInterval(checkHealth, 30000);
+
+
+        // Load upload limits on page load
+        async function loadUploadLimits() {
+            try {
+                const response = await fetchWithTimeout('/api/user/upload-limits', {}, 5000);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const limits = await response.json();
+                const instructions = document.getElementById('uploadInstructions');
+                if (instructions) {
+                    const maxSizeMB = limits.max_content_length_mb || 1000;
+                    const maxSizeGB = (maxSizeMB / 1024).toFixed(1);
+                    const sizeDisplay = maxSizeMB >= 1000 ? `${maxSizeGB} GB` : `${maxSizeMB} MB`;
+                    instructions.innerHTML = `
+                        Upload multiple files (PDF, TXT, DOCX, CSV, XLSX) to train your knowledge base.
+                        <br><strong>Limits:</strong> Max ${limits.max_files_per_request || 100} files per request, Max ${sizeDisplay} total size.
+                    `;
+                }
+            } catch (error) {
+                console.error('Error loading upload limits:', error);
+                const instructions = document.getElementById('uploadInstructions');
+                if (instructions) {
+                    instructions.innerHTML = `
+                        Upload multiple files (PDF, TXT, DOCX, CSV, XLSX) to train your knowledge base.
+                        <br><strong>Limits:</strong> Max 100 files per request, Max 1 GB total size.
+                    `;
+                }
+            }
+        }
+        loadUploadLimits();
+
+        // Storage status functions
+        async function refreshStorageStatus() {
+            const statusContent = document.getElementById('storageStatusContent');
+            if (!statusContent) {
+                console.warn('Storage status content element not found');
+                return;
+            }
+            
+            try {
+                    // Use namespaced storage-status endpoint. Handle non-JSON or missing fields gracefully.
+                    const response = await fetchWithTimeout('/api/user/storage-status', {}, 5000);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                    let data = {};
+                    try {
+                        data = await response.json();
+                    } catch (e) {
+                        console.warn('Storage status returned non-JSON', e);
+                        data = {};
+                    }
+                
+                // Normalize fields and provide fallbacks so UI doesn't break
+                const usagePercent = Number(data.usage_percent) || 0;
+                const totalGB = Number(data.total_size_gb) || 0;
+                const maxGB = Number(data.max_storage_size_gb) || 130;
+                const availableGB = Number(data.available_space_gb) || Math.max(0, maxGB - totalGB);
+                const fileCount = Number(data.file_count) || 0;
+                
+                // Determine progress bar class
+                let progressClass = '';
+                if (data.critical) {
+                    progressClass = 'critical';
+                } else if (data.warning) {
+                    progressClass = 'warning';
+                }
+                
+                // Ensure percentage doesn't exceed 100
+                const displayPercent = Math.min(Math.max(usagePercent, 0), 100);
+                
+                statusContent.innerHTML = `
+                    <div class="storage-progress-bar">
+                        <div class="storage-progress-fill ${progressClass}" style="width: ${displayPercent}%">
+                            ${displayPercent.toFixed(1)}%
+                        </div>
+                    </div>
+                    <div class="storage-info-grid">
+                        <div class="storage-info-item">
+                            <div class="storage-info-value">${maxGB.toFixed(1)} GB</div>
+                            <div class="storage-info-label">Total Limit</div>
+                        </div>
+                        <div class="storage-info-item">
+                            <div class="storage-info-value">${totalGB.toFixed(2)} GB</div>
+                            <div class="storage-info-label">Used</div>
+                        </div>
+                        <div class="storage-info-item">
+                            <div class="storage-info-value">${availableGB.toFixed(2)} GB</div>
+                            <div class="storage-info-label">Available</div>
+                        </div>
+                        <div class="storage-info-item">
+                            <div class="storage-info-value">${fileCount}</div>
+                            <div class="storage-info-label">Files</div>
+                        </div>
+                    </div>
+                    ${data.warning || data.critical ? `
+                        <div style="margin-top: 10px; padding: 8px; background: ${data.critical ? '#f8d7da' : '#fff3cd'}; border-radius: 5px; color: ${data.critical ? '#721c24' : '#856404'}; font-size: 0.9em;">
+                            ${data.critical ? '⚠️ CRITICAL: Storage is at 95% or more!' : '⚠️ WARNING: Storage is at 80% or more!'}
+                        </div>
+                    ` : ''}
+                `;
+            } catch (error) {
+                console.error('Error fetching storage status:', error);
+                if (statusContent) {
+                    // Fallback UI when storage API is unavailable
+                    statusContent.innerHTML = `
+                        <div style="padding: 10px;">
+                            <div class="error">Storage information unavailable</div>
+                            <div style="font-size: 0.9em; color: #666; margin-top:8px;">Please check server or try refreshing.</div>
+                        </div>
+                    `;
+                }
+            }
+        }
+
+        // Load storage status on page load
+        refreshStorageStatus();
+        
+        // Refresh storage status every 30 seconds
+        setInterval(refreshStorageStatus, 30000);
+
+        // ============================================
+        // Upload & Train Knowledge Base Functionality
+        // ============================================
+        let selectedFiles = [];
+
+        function selectFiles() {
+            document.getElementById('knowledgeBaseFiles').click();
+        }
+
+        document.getElementById('knowledgeBaseFiles').addEventListener('change', function(e) {
+            const files = Array.from(e.target.files);
+            files.forEach(file => {
+                // Check if file is already selected
+                if (!selectedFiles.find(f => f.name === file.name && f.size === file.size)) {
+                    selectedFiles.push(file);
+                }
+            });
+            updateFileList();
+        });
+
+        // Track uploaded files with their IDs and status
+        let uploadedFiles = {}; // file_id -> {file object, status, error, etc.}
+
+        function updateFileList() {
+            const fileList = document.getElementById('selectedFilesList');
+            const fileHeader = document.getElementById('selectedFilesHeader');
+            const fileCount = document.getElementById('fileCount');
+            
+            fileList.innerHTML = '';
+            
+            // Show selected files (not yet uploaded)
+            const selectedCount = selectedFiles.length;
+            // Show uploaded files (tracked by ID)
+            const uploadedCount = Object.keys(uploadedFiles).length;
+            const totalCount = selectedCount + uploadedCount;
+            
+            if (totalCount > 0) {
+                fileHeader.style.display = 'block';
+                fileCount.textContent = totalCount;
+                
+                // Show selected files (not yet uploaded)
+                selectedFiles.forEach((file, index) => {
+                    const fileItem = document.createElement('div');
+                    fileItem.className = 'file-item-train';
+                    
+                    const fileSize = formatFileSize(file.size);
+                    
+                    fileItem.innerHTML = `
+                        <div class="file-item-info">
+                            <div class="file-item-name">${file.name}</div>
+                            <div class="file-item-size">${fileSize}</div>
+                            <div class="file-item-status">
+                                <span class="status-badge queued">Ready to Upload</span>
+                            </div>
+                        </div>
+                        <div class="file-item-actions">
+                            <button class="file-item-remove" onclick="removeFile(${index})" title="Remove file">×</button>
+                        </div>
+                    `;
+                    
+                    fileList.appendChild(fileItem);
+                });
+                
+                // Show uploaded files with their status
+                Object.values(uploadedFiles).forEach(fileData => {
+                    const fileItem = document.createElement('div');
+                    fileItem.className = 'file-item-train';
+                    fileItem.id = `file-item-${fileData.file_id}`;
+                    
+                    const fileSize = formatFileSize(fileData.size || 0);
+                    const status = fileData.status || 'unknown';
+                    const error = fileData.error || '';
+                    const chunks = fileData.chunks || 0;
+                    const progress = parseInt(fileData.progress) || 0;  // Ensure progress is a number
+                    const message = fileData.message || '';
+                    
+                    // Status badge - always show a badge for all statuses
+                    let statusBadge = '';
+                    let progressBar = '';
+                    let messageDisplay = '';
+                    
+                    if (status === 'queued') {
+                        statusBadge = `<span class="status-badge queued">📋 Queued</span>`;
+                        progressBar = ''; // No progress bar for queued files
+                    } else if (status === 'uploading') {
+                        statusBadge = `<span class="status-badge uploading">⬆️ Uploading ${progress}%</span>`;
+                        // Show progress bar ONLY during file upload with real-time percentage (only if progress > 0)
+                        if (progress > 0) {
+                            progressBar = `
+                                <div class="file-progress-bar">
+                                    <div class="file-progress-fill" style="width: ${progress}%">${progress}%</div>
+                                </div>
+                            `;
+                        } else {
+                            progressBar = '';
+                        }
+                    } else if (status === 'processing') {
+                        statusBadge = `<span class="status-badge processing">⚙️ Processing</span>`;
+                        progressBar = ''; // No progress bar for processing files
+                        // messageDisplay will be set later with escaped message
+                    } else if (status === 'success') {
+                        statusBadge = `<span class="status-badge success">✅ Success (${chunks} chunks)</span>`;
+                        progressBar = ''; // No progress bar for success
+                        // messageDisplay will be set later with escaped message
+                    } else if (status === 'failed') {
+                        statusBadge = `<span class="status-badge failed">❌ Failed</span>`;
+                        progressBar = ''; // No progress bar for failed files
+                    } else if (status === 'cancelled') {
+                        statusBadge = `<span class="status-badge cancelled">🚫 Cancelled</span>`;
+                        progressBar = ''; // No progress bar for cancelled files
+                    } else {
+                        // Default status badge for unknown statuses
+                        statusBadge = `<span class="status-badge">❓ ${status || 'Unknown'}</span>`;
+                        progressBar = ''; // No progress bar for unknown status
+                    }
+                    
+                    // Ensure statusBadge is always set (fallback)
+                    if (!statusBadge) {
+                        statusBadge = `<span class="status-badge">❓ ${status || 'Unknown'}</span>`;
+                    }
+                    
+                    // Action buttons - escape file_id to prevent XSS
+                    const escapedFileId = String(fileData.file_id || '').replace(/'/g, "\\'");
+                    const escapedFilename = String(fileData.filename || fileData.name || 'Unknown').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    const escapedError = error ? String(error).replace(/</g, '&lt;').replace(/>/g, '&gt;') : '';
+                    const escapedMessage = message ? String(message).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') : '';
+                    
+                    // Update messageDisplay with escaped message
+                    if (status === 'processing' && message) {
+                        messageDisplay = `<div class="file-item-message">${escapedMessage}</div>`;
+                    } else if (status === 'success') {
+                        if (message) {
+                            messageDisplay = `<div class="file-item-message success">${escapedMessage}</div>`;
+                        } else {
+                            messageDisplay = `<div class="file-item-message success">Successfully completed file '${escapedFilename}' with ${chunks} chunks</div>`;
+                        }
+                    }
+                    
+                    let actionButtons = '';
+                    if (status === 'queued' || status === 'processing') {
+                        actionButtons = `<button class="file-item-cancel" onclick="cancelFile('${escapedFileId}')" title="Cancel">✕</button>`;
+                    } else if (status === 'failed') {
+                        // Failed files only show retry button
+                        actionButtons = `<button class="file-item-retry" onclick="retryFile('${escapedFileId}')" title="Retry">↻</button>`;
+                    } else if (status === 'success') {
+                        actionButtons = `<button class="file-item-remove" onclick="removeUploadedFile('${escapedFileId}')" title="Remove">×</button>`;
+                    } else if (status === 'cancelled') {
+                        actionButtons = `<button class="file-item-remove" onclick="removeUploadedFile('${escapedFileId}')" title="Remove">×</button>`;
+                    }
+                    
+                    fileItem.innerHTML = `
+                        <div class="file-item-info">
+                            <div class="file-item-name">${escapedFilename}</div>
+                            <div class="file-item-size">${fileSize}</div>
+                            <div class="file-item-status">
+                                ${statusBadge || `<span class="status-badge">❓ ${status || 'Unknown'}</span>`}
+                            </div>
+                            ${status === 'uploading' && progressBar ? progressBar : ''}
+                            ${messageDisplay}
+                            ${escapedError ? `<div class="file-item-error">Error: ${escapedError}</div>` : ''}
+                        </div>
+                        <div class="file-item-actions">
+                            ${actionButtons || ''}
+                        </div>
+                    `;
+                    
+                    fileList.appendChild(fileItem);
+                });
+            } else {
+                fileHeader.style.display = 'none';
+            }
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        }
+
+        function removeFile(index) {
+            selectedFiles.splice(index, 1);
+            updateFileList();
+            // Reset file input
+            document.getElementById('knowledgeBaseFiles').value = '';
+        }
+
+        function clearFiles() {
+            // Clear selected files (not yet uploaded)
+            selectedFiles = [];
+            
+            // Clear uploaded files that are in final states (success, failed, cancelled)
+            // Keep files that are actively processing (queued, uploading, processing)
+            Object.keys(uploadedFiles).forEach(fileId => {
+                const fileData = uploadedFiles[fileId];
+                const status = fileData.status || 'unknown';
+                // Only remove files that are in final states
+                if (status === 'success' || status === 'failed' || status === 'cancelled') {
+                    delete uploadedFiles[fileId];
+                }
+            });
+            
+            updateFileList();
+            document.getElementById('knowledgeBaseFiles').value = '';
+            
+            // Clear upload status if no files are being processed
+            const hasActiveFiles = Object.values(uploadedFiles).some(f => {
+                const status = f.status || 'unknown';
+                return status === 'queued' || status === 'uploading' || status === 'processing';
+            });
+            
+            if (!hasActiveFiles) {
+                document.getElementById('uploadStatus').className = 'upload-status';
+                document.getElementById('uploadStatus').style.display = 'none';
+                document.getElementById('uploadStatus').textContent = '';
+            }
+        }
+
+        async function uploadAndTrain() {
+            if (selectedFiles.length === 0) {
+                showUploadStatus('error', 'Please select at least one file to upload.');
+                return;
+            }
+
+            // Check file count limit
+            const limits = await fetch('/api/user/upload-limits').then(r => r.json()).catch(() => ({}));
+            const maxFiles = limits.max_files_per_request || 100;
+            const maxSizeMB = limits.max_content_length_mb || 1000;
+
+            if (selectedFiles.length > maxFiles) {
+                showUploadStatus('error', `Too many files. Maximum ${maxFiles} files per request. Please select fewer files.`);
+                return;
+            }
+
+            // Check total file size
+            const totalSize = selectedFiles.reduce((sum, file) => sum + (file.size || 0), 0);
+            const totalSizeMB = totalSize / (1024 * 1024);
+            if (totalSizeMB > maxSizeMB) {
+                showUploadStatus('error', `Total file size (${totalSizeMB.toFixed(2)} MB) exceeds ${maxSizeMB} MB limit. Please reduce file sizes.`);
+                return;
+            }
+
+            const uploadBtn = document.getElementById('uploadTrainBtn');
+            const uploadStatus = document.getElementById('uploadStatus');
+            
+            // Disable button and show loading
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = '🚀 Training...';
+            showUploadStatus('loading', `Uploading ${selectedFiles.length} file(s) (${totalSizeMB.toFixed(2)} MB). Progress: 0% - Starting upload...`);
+
+            // Create temporary file entries for upload progress tracking
+            let tempFileIds = {};
+            selectedFiles.forEach((file, index) => {
+                const tempId = `temp_${Date.now()}_${index}`;
+                tempFileIds[tempId] = {
+                    file_id: tempId,
+                    filename: file.name,
+                    name: file.name,
+                    size: file.size,
+                    status: 'uploading',
+                    error: null,
+                    chunks: 0,
+                    progress: 0
+                };
+                uploadedFiles[tempId] = tempFileIds[tempId];
+            });
+            updateFileList();
+
+            try {
+                const formData = new FormData();
+                selectedFiles.forEach(file => {
+                    formData.append('files', file);
+                });
+
+                // Use XMLHttpRequest for upload progress tracking
+                const xhr = new XMLHttpRequest();
+                
+                // Track upload progress
+                xhr.upload.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                        const uploadProgress = Math.round((e.loaded / e.total) * 100);
+                        // Update all temporary file entries with upload progress
+                        Object.keys(tempFileIds).forEach(tempId => {
+                            if (uploadedFiles[tempId]) {
+                                uploadedFiles[tempId].progress = uploadProgress;
+                                uploadedFiles[tempId].status = 'uploading';
+                            }
+                        });
+                        updateFileList();
+                        showUploadStatus('loading', `Uploading ${selectedFiles.length} file(s) (${totalSizeMB.toFixed(2)} MB). Progress: ${uploadProgress}%`);
+                    }
+                });
+
+                // Handle response
+                const response = await new Promise((resolve, reject) => {
+                    xhr.onload = () => {
+                        if (xhr.status >= 200 && xhr.status < 300) {
+                            resolve({
+                                ok: true,
+                                status: xhr.status,
+                                json: async () => JSON.parse(xhr.responseText)
+                            });
+                        } else {
+                            // Extract error message from response body
+                            let errorMessage = `HTTP ${xhr.status}: ${xhr.statusText}`;
+                            try {
+                                const errorData = JSON.parse(xhr.responseText);
+                                if (errorData.error) {
+                                    errorMessage = typeof errorData.error === 'string' 
+                                        ? errorData.error 
+                                        : errorData.error.message || errorMessage;
+                                    // Remove redundant "Error: " prefix if present
+                                    if (errorMessage.startsWith('Error: ')) {
+                                        errorMessage = errorMessage.substring(7);
+                                    }
+                                } else if (errorData.message) {
+                                    errorMessage = errorData.message;
+                                }
+                            } catch (e) {
+                                // If JSON parsing fails, use default error message
+                            }
+                            reject({
+                                status: xhr.status,
+                                statusText: xhr.statusText,
+                                message: errorMessage,
+                                responseText: xhr.responseText
+                            });
+                        }
+                    };
+                    xhr.onerror = () => reject({
+                        status: 0,
+                        statusText: 'Network Error',
+                        message: 'Network error. Please check your connection and try again.'
+                    });
+                    xhr.open('POST', '/api/user/upload-files');
+                    xhr.send(formData);
+                });
+
+                // Get response as text first
+                const text = await response.text();
+                
+                // Parse JSON with error handling
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch (parseError) {
+                    throw new Error("Server returned invalid JSON");
+                }
+                
+                // Check for error status
+                if (data.status === "error") {
+                    alert(data.message || "Upload failed");
+                    throw new Error(data.message || "Upload failed");
+                }
+
+                // Remove temporary file entries (upload complete)
+                Object.keys(tempFileIds).forEach(tempId => {
+                    delete uploadedFiles[tempId];
+                });
+
+                if (response.status === 200 && (data.status === 'completed' || data.status === 'queued')) {
+                    // Files processed successfully
+                    const completedCount = data.completed || data.queued || 0;
+                    const totalChunks = data.total_chunks || 0;
+                    
+                    showUploadStatus('success', `${completedCount} file(s) processed successfully! ${totalChunks} chunks stored in knowledge base.`);
+                    
+                    // Track uploaded files with their IDs
+                    if (data.sources && Array.isArray(data.sources)) {
+                        data.sources.forEach(source => {
+                            if (source.file_id && source.status === 'completed') {
+                                uploadedFiles[source.file_id] = {
+                                    file_id: source.file_id,
+                                    filename: source.file_path,
+                                    status: 'completed',
+                                    error: null,
+                                    chunks: source.chunks || 0,
+                                    progress: 100
+                                };
+                                console.log(`Successfully processed file: ${source.file_path} (${source.chunks || 0} chunks)`);
+                            } else if (source.status === 'failed') {
+                                uploadedFiles[`failed_${Date.now()}_${source.file_path}`] = {
+                                    file_id: null,
+                                    filename: source.file_path,
+                                    status: 'failed',
+                                    error: source.error || 'Processing failed',
+                                    chunks: 0,
+                                    progress: 0
+                                };
+                                console.error(`Failed to process file: ${source.file_path} - ${source.error}`);
+                            }
+                        });
+                    }
+                    
+                    // Clear selected files
+                    selectedFiles = [];
+                    document.getElementById('knowledgeBaseFiles').value = '';
+                    updateFileList();
+                    
+                    // Re-enable upload button
+                    uploadBtn.disabled = false;
+                    uploadBtn.textContent = '🚀 Upload & Train';
+                    
+                    refreshQueueStatus();
+                    
+                    // Only poll if files are queued (not completed)
+                    if (data.status === 'queued') {
+                        // Poll file status with progress updates
+                        const pollInterval = setInterval(async () => {
+                        await refreshQueueStatus();
+                        await refreshFileStatuses();
+                        
+                        // Poll individual file statuses for progress updates (10%, 20%, 40%, 60%, 80%, 100%)
+                        const fileIds = Object.keys(uploadedFiles);
+                        let totalProgress = 0;
+                        let completedCount = 0;
+                        let processingCount = 0;
+                        
+                        for (const fileId of fileIds) {
+                            try {
+                                const fileStatusResponse = await fetch(`/api/user/file-status/${encodeURIComponent(fileId)}`);
+                                if (fileStatusResponse.ok) {
+                                    const fileStatus = await fileStatusResponse.json();
+                                    if (fileStatus.file_id && uploadedFiles[fileStatus.file_id]) {
+                                        const previousStatus = uploadedFiles[fileStatus.file_id].status;
+                                        
+                                        // Update progress from API response (ensure it's a number)
+                                        uploadedFiles[fileStatus.file_id].progress = parseInt(fileStatus.progress) || 0;
+                                        uploadedFiles[fileStatus.file_id].status = fileStatus.status || uploadedFiles[fileStatus.file_id].status;
+                                        uploadedFiles[fileStatus.file_id].chunks = fileStatus.chunks || 0;
+                                        uploadedFiles[fileStatus.file_id].error = fileStatus.error || null;
+                                        
+                                        // Calculate overall progress
+                                        if (fileStatus.status === 'success') {
+                                            // Log success message when file completes (status changes to success)
+                                            if (previousStatus !== 'success') {
+                                                const fileName = fileStatus.filename || fileStatus.file_path || uploadedFiles[fileStatus.file_id].filename || 'unknown';
+                                                console.log(`Successfully uploaded for file: ${fileName}`);
+                                                alert(`Successfully uploaded for file: ${fileName}`);
+                                            }
+                                            completedCount++;
+                                            totalProgress += 100;
+                                        } else if (fileStatus.status === 'processing' || fileStatus.status === 'queued') {
+                                            processingCount++;
+                                            totalProgress += fileStatus.progress || 0;
+                                        } else {
+                                            totalProgress += fileStatus.progress || 0;
+                                        }
+                                    }
+                                }
+                            } catch (error) {
+                                console.error(`Error polling file status for ${fileId}:`, error);
+                            }
+                        }
+                        
+                        // Update file list display with progress
+                        updateFileList();
+                        
+                        // Update upload status message (no progress percentage after upload)
+                        if (processingCount > 0 || completedCount < fileIds.length) {
+                            showUploadStatus('loading', `Processing ${fileIds.length} file(s). (${completedCount} completed, ${processingCount} processing)`);
+                        }
+                        
+                        // Check for newly completed files and show success messages
+                        const status = await fetch('/api/user/queue-status').then(r => r.json()).catch(() => ({}));
+                        const filesStatus = await fetch('/api/user/files-status').then(r => r.json()).catch(() => ({files: []}));
+                        
+                        if (filesStatus.files && Array.isArray(filesStatus.files)) {
+                            filesStatus.files.forEach(fileData => {
+                                if (fileData.status === 'success' && fileData.file_id && uploadedFiles[fileData.file_id]) {
+                                    const existingFile = uploadedFiles[fileData.file_id];
+                                    // Show success message if file just completed
+                                    if (existingFile.status !== 'success') {
+                                        const fileName = fileData.filename || fileData.file_path || 'unknown';
+                                        const successMsg = fileData.message || `Successfully uploaded file: ${fileName}`;
+                                        console.log(`Successfully uploaded for file: ${fileName}`);
+                                        alert(`Successfully uploaded for file: ${fileName}`);
+                                        if (fileData.message) {
+                                            showUploadStatus('success', fileData.message);
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                        
+                        if (status.queue_size === 0 && status.processing === 0) {
+                            clearInterval(pollInterval);
+                            const completedFiles = filesStatus.files?.filter(f => f.status === 'success') || [];
+                            let successMessage = `All files processed! ${status.completed} file(s) completed.`;
+                            
+                            if (completedFiles.length > 0) {
+                                const fileMessages = completedFiles.map(f => {
+                                    if (f.message) return f.message;
+                                    if (f.chunks) return `Successfully completed file '${f.filename}' with ${f.chunks} chunks`;
+                                    return null;
+                                }).filter(m => m !== null);
+                                
+                                if (fileMessages.length > 0) {
+                                    successMessage += '\n\n' + fileMessages.join('\n');
+                                }
+                                
+                                // Log each successfully completed file to console and show alert
+                                completedFiles.forEach(f => {
+                                    const fileName = f.filename || f.file_path || 'unknown';
+                                    console.log(`Successfully uploaded for file: ${fileName}`);
+                                    alert(`Successfully uploaded for file: ${fileName}`);
+                                });
+                            }
+                            
+                            showUploadStatus('success', successMessage);
+                            setTimeout(() => {
+                                document.getElementById('queueStatus').style.display = 'none';
+                            }, 5000);
+                            checkHealth();
+                        }
+                    }, 2000);
+                    } // End if data.status === 'queued'
+                } else if (response.ok && data.status === 'success') {
+                    let message = `Successfully processed ${data.processed} file(s) with ${data.chunks_created} chunks created.`;
+                    
+                    // Show individual file success messages
+                    if (data.sources && Array.isArray(data.sources)) {
+                        const successFiles = data.sources.filter(s => s.status === 'success');
+                        if (successFiles.length > 0) {
+                            const fileMessages = successFiles.map(s => {
+                                if (s.message) {
+                                    return s.message;
+                                } else if (s.chunks) {
+                                    return `Successfully completed file '${s.file_path}' with ${s.chunks} chunks`;
+                                }
+                                return null;
+                            }).filter(m => m !== null);
+                            
+                            if (fileMessages.length > 0) {
+                                message += '\n\n' + fileMessages.join('\n');
+                            }
+                            
+                            // Log each successfully processed file to console and show alert
+                            successFiles.forEach(s => {
+                                const fileName = s.file_path || s.filename || 'unknown';
+                                console.log(`Successfully uploaded for file: ${fileName}`);
+                                alert(`Successfully uploaded for file: ${fileName}`);
+                            });
+                        }
+                    }
+                    
+                    if (data.duplicates && data.duplicates > 0) {
+                        message += `\n\n${data.duplicates} duplicate file(s) were skipped.`;
+                    }
+                    showUploadStatus('success', message);
+                    
+                    // Clear files after successful upload
+                    setTimeout(() => {
+                        clearFiles();
+                    }, 5000);
+                    
+                    // Refresh system status
+                    checkHealth();
+                } else {
+                    let errorMsg = data.error || data.message || 'Upload failed. Please try again.';
+                    
+                    // Use the error message from the server (it already includes details)
+                    // The server formats it nicely, so we can use it directly
+                    if (data.error) {
+                        // Remove "Error: " prefix if present (format_error_response adds it)
+                        errorMsg = data.error.replace(/^Error:\s*/i, '');
+                    }
+                    
+                    // Also add sources for additional context if needed
+                    if (data.sources && Array.isArray(data.sources)) {
+                        const failedFiles = data.sources.filter(s => s.status === 'error');
+                        if (failedFiles.length > 0 && !errorMsg.includes('Failed files')) {
+                            // Only add if not already included in the error message
+                            const failedNames = failedFiles.map(f => f.file_path || f.filename || 'unknown').slice(0, 3);
+                            errorMsg += `\n\nFailed files: ${failedNames.join(', ')}`;
+                        }
+                    }
+                    
+                    showUploadStatus('error', errorMsg);
+                }
+            } catch (error) {
+                console.error('Upload error:', error);
+                // Clean up temporary file entries on error
+                if (tempFileIds && Object.keys(tempFileIds).length > 0) {
+                    Object.keys(tempFileIds).forEach(tempId => {
+                        delete uploadedFiles[tempId];
+                    });
+                    updateFileList();
+                }
+                
+                let errorMessage = 'Upload failed. Please try again.';
+                
+                // Handle error object structure from XMLHttpRequest
+                if (error && typeof error === 'object') {
+                    if (error.message) {
+                        errorMessage = error.message;
+                    } else if (error.statusText) {
+                        errorMessage = `Error: ${error.statusText}`;
+                    }
+                } else if (error && typeof error === 'string') {
+                    errorMessage = error;
+                } else if (error && error.message) {
+                    errorMessage = error.message;
+                }
+                
+                // Handle specific error types
+                if (errorMessage.includes('413') || errorMessage.includes('Payload Too Large')) {
+                    errorMessage = `File size too large. Maximum ${maxSizeMB} MB total per request.`;
+                } else if (errorMessage.includes('500') || errorMessage.includes('Vector store')) {
+                    errorMessage = 'Knowledge base initialization error. Please check system configuration or try again.';
+                } else if (errorMessage.includes('NetworkError') || errorMessage.includes('Network error')) {
+                    errorMessage = 'Network error. Please check your connection and try again.';
+                } else if (errorMessage.includes('400') || errorMessage.includes('BAD REQUEST')) {
+                    // Error message already extracted from response body, use it as-is
+                    if (!errorMessage.includes('HTTP')) {
+                        // If it's not the default HTTP message, it's already the detailed error
+                    }
+                }
+                
+                showUploadStatus('error', errorMessage);
+            } finally {
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = '🚀 Upload & Train';
+            }
+        }
+
+        async function refreshQueueStatus() {
+            try {
+                const response = await fetch('/api/user/queue-status');
+                const data = await response.json();
+                
+                const statusContent = document.getElementById('queueStatusContent');
+                statusContent.innerHTML = `
+                    <div class="queue-stat-item">
+                        <div class="queue-stat-value">${data.queue_size || 0}</div>
+                        <div class="queue-stat-label">Pending</div>
+                    </div>
+                    <div class="queue-stat-item">
+                        <div class="queue-stat-value">${data.processing || 0}</div>
+                        <div class="queue-stat-label">Processing</div>
+                    </div>
+                    <div class="queue-stat-item">
+                        <div class="queue-stat-value">${data.completed || 0}</div>
+                        <div class="queue-stat-label">Completed</div>
+                    </div>
+                    <div class="queue-stat-item">
+                        <div class="queue-stat-value">${data.failed || 0}</div>
+                        <div class="queue-stat-label">Failed</div>
+                    </div>
+                    <div class="queue-stat-item">
+                        <div class="queue-stat-value">${data.total_processed || 0}</div>
+                        <div class="queue-stat-label">Total Processed</div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error fetching queue status:', error);
+            }
+        }
+
+        async function refreshFileStatuses() {
+            try {
+                const response = await fetch('/api/user/files-status');
+                const data = await response.json();
+                
+                if (data.files && Array.isArray(data.files)) {
+                    data.files.forEach(fileData => {
+                        if (fileData.file_id && uploadedFiles[fileData.file_id]) {
+                            // Update existing file status including progress
+                            uploadedFiles[fileData.file_id] = {
+                                ...uploadedFiles[fileData.file_id],
+                                ...fileData,
+                                progress: fileData.progress !== undefined ? fileData.progress : uploadedFiles[fileData.file_id].progress || 0
+                            };
+                        } else if (fileData.file_id) {
+                            // Add new file
+                            uploadedFiles[fileData.file_id] = {
+                                ...fileData,
+                                progress: fileData.progress || 0
+                            };
+                        }
+                    });
+                    updateFileList();
+                }
+            } catch (error) {
+                console.error('Error fetching file statuses:', error);
+            }
+        }
+
+        async function cancelFile(fileId) {
+            if (!fileId) {
+                alert('Invalid file ID');
+                return;
+            }
+            
+            if (!confirm('Are you sure you want to cancel this file?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/user/file-cancel/${encodeURIComponent(fileId)}`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Update local tracking
+                    if (uploadedFiles[fileId]) {
+                        uploadedFiles[fileId].status = 'cancelled';
+                        uploadedFiles[fileId].error = 'File processing was cancelled by user';
+                    }
+                    updateFileList();
+                    refreshQueueStatus();
+                } else {
+                    alert(`Error: ${data.error || 'Failed to cancel file'}`);
+                }
+            } catch (error) {
+                console.error('Error cancelling file:', error);
+                alert(`Error cancelling file: ${error.message}`);
+            }
+        }
+
+        async function retryFile(fileId) {
+            if (!fileId) {
+                alert('Invalid file ID');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/user/file-retry/${encodeURIComponent(fileId)}`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Update local tracking
+                    if (uploadedFiles[fileId]) {
+                        uploadedFiles[fileId].status = 'queued';
+                        uploadedFiles[fileId].error = null;
+                        uploadedFiles[fileId].chunks = 0;
+                    }
+                    updateFileList();
+                    refreshQueueStatus();
+                } else {
+                    alert(`Error: ${data.error || 'Failed to retry file'}`);
+                }
+            } catch (error) {
+                console.error('Error retrying file:', error);
+                alert(`Error retrying file: ${error.message}`);
+            }
+        }
+
+        function removeUploadedFile(fileId) {
+            if (!fileId) {
+                return;
+            }
+            
+            if (confirm('Remove this file from the list?')) {
+                delete uploadedFiles[fileId];
+                updateFileList();
+            }
+        }
+
+        function showUploadStatus(type, message) {
+            const uploadStatus = document.getElementById('uploadStatus');
+            uploadStatus.className = `upload-status ${type}`;
+            // Escape HTML to prevent XSS, but preserve newlines
+            const escapedMessage = String(message || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            // Use innerHTML with white-space: pre-wrap to preserve newlines and formatting
+            uploadStatus.style.whiteSpace = 'pre-wrap';
+            uploadStatus.textContent = escapedMessage;
+            uploadStatus.style.display = 'block';
+            
+            // Scroll to error message if it's an error
+            if (type === 'error') {
+                uploadStatus.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }
+    </script>
+</body>
+</html>

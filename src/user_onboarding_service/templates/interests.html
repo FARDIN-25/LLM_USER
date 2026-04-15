@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>FinTax Setup</title>
+
+    <style>
+        body {
+            background: #0b0f19;
+            color: white;
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            width: 700px;
+            max-width: calc(100vw - 40px);
+        }
+
+        h2 {
+            font-weight: 400;
+            margin-bottom: 25px;
+        }
+
+        .options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .option {
+            padding: 12px 16px;
+            border: 1px solid #374151;
+            border-radius: 12px;
+            cursor: pointer;
+            background: #111827;
+            user-select: none;
+        }
+
+        .option.selected {
+            background: #2563eb;
+            border-color: #2563eb;
+        }
+
+        button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+    <h2>What are you into, {{ user_name }}? Pick three topics to explore.</h2>
+
+    <div class="options" id="options">
+        <div class="option" onclick="toggle(this)">📄 Income Tax Filing</div>
+        <div class="option" onclick="toggle(this)">🧑‍💻 Filing Assistance</div>
+        <div class="option" onclick="toggle(this)">💸 Deductions &amp; Savings</div>
+        <div class="option" onclick="toggle(this)">📈 Investments &amp; Tax Saving</div>
+        <div class="option" onclick="toggle(this)">📬 Notices &amp; Compliance</div>
+        <div class="option" onclick="toggle(this)">💰 Tax Refunds &amp; Status</div>
+        <div class="option" onclick="toggle(this)">📑 Document Preparation</div>
+        <div class="option" onclick="toggle(this)">🧠 Tax Planning</div>
+        <div class="option" onclick="toggle(this)">🧾 GST &amp; Indirect Taxes</div>
+    </div>
+
+    <button onclick="submitInterests()">Let’s go</button>
+</div>
+
+<script>
+function toggle(el) {
+    if (el.classList.contains("selected")) {
+        el.classList.remove("selected");
+    } else {
+        const selectedCount = document.querySelectorAll(".option.selected").length;
+        if (selectedCount >= 3) {
+            alert("Pick only 3");
+            return;
+        }
+        el.classList.add("selected");
+    }
+}
+
+async function submitInterests() {
+    const selected = Array.from(document.querySelectorAll(".option.selected"))
+        .map(el => el.innerText.replace(/[^\x00-\x7F]/g, "").trim());
+
+    if (selected.length !== 3) {
+        alert("Please select exactly 3 topics");
+        return;
+    }
+
+    const res = await fetch("/onboarding/interests", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            interests: selected
+        })
+    });
+
+    if (res.ok) {
+        window.location.href = "/onboarding/profession";
+    } else {
+        alert("Something went wrong");
+    }
+}
+</script>
+
+</body>
+</html>

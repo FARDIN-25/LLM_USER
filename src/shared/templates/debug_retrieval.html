@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Raw Retrieval Debug | Fintax</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --bg: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --text-main: #f8fafc;
+            --text-dim: #94a3b8;
+            --accent: #22d3ee;
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg);
+            background-image: radial-gradient(circle at 50% -20%, #1e1b4b, var(--bg));
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            background: linear-gradient(to right, #818cf8, #22d3ee);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+            color: var(--text-dim);
+            font-size: 1.1rem;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 20px;
+        }
+
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        button:hover {
+            background-color: var(--primary-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        .status-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .meta-item {
+            font-size: 0.9rem;
+        }
+
+        .meta-label {
+            color: var(--text-dim);
+            margin-right: 8px;
+        }
+
+        .results-list {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .chunk-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 24px;
+            transition: transform 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            animation: slideUp 0.6s ease-out;
+        }
+
+        .chunk-card:hover {
+            border-color: rgba(99, 102, 241, 0.5);
+            transform: translateX(10px);
+        }
+
+        .chunk-card::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 4px;
+            background: var(--primary);
+        }
+
+        .chunk-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .chunk-source {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .chunk-score {
+            font-family: monospace;
+            background: rgba(99, 102, 241, 0.2);
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            color: #c7d2fe;
+        }
+
+        .chunk-text {
+            line-height: 1.6;
+            color: var(--text-main);
+            font-size: 1rem;
+        }
+
+        .loader {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        #error-msg {
+            color: #ef4444;
+            text-align: center;
+            display: none;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Raw Retrieval Debug</h1>
+            <p class="subtitle">Visualizing the Top 5 results before Reranking</p>
+        </header>
+
+        <div class="controls">
+            <button onclick="fetchLatest()">🔄 Refresh Latest Results</button>
+        </div>
+
+        <div id="status-container" class="status-card" style="display: none;">
+            <div class="meta-item">
+                <span class="meta-label">Query ID:</span>
+                <span id="q-id">-</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-label">Time:</span>
+                <span id="ts">-</span>
+            </div>
+        </div>
+
+        <div id="loader" class="loader">
+            <p>Fetching data from the retrieval service...</p>
+        </div>
+
+        <div id="error-msg">Failed to fetch debug data. Ensure you have made an active chat query first.</div>
+
+        <div id="results" class="results-list">
+            <!-- Results will be injected here -->
+        </div>
+    </div>
+
+    <script>
+        async function fetchLatest() {
+            const resultsDiv = document.getElementById('results');
+            const loader = document.getElementById('loader');
+            const errorMsg = document.getElementById('error-msg');
+            const statusCard = document.getElementById('status-container');
+
+            loader.style.display = 'block';
+            errorMsg.style.display = 'none';
+            resultsDiv.innerHTML = '';
+
+            try {
+                const response = await fetch('/api/debug/retrieval/latest');
+                const data = await response.json();
+
+                loader.style.display = 'none';
+
+                if (data.status === 'success' && data.raw_retrieval.length > 0) {
+                    statusCard.style.display = 'flex';
+                    document.getElementById('q-id').textContent = data.query_id;
+                    document.getElementById('ts').textContent = new Date(data.timestamp).toLocaleString();
+
+                    data.raw_retrieval.forEach(chunk => {
+                        const card = document.createElement('div');
+                        card.className = 'chunk-card';
+                        card.innerHTML = `
+                            <div class="chunk-header">
+                                <span class="chunk-source">${chunk.source}</span>
+                                <span class="chunk-score">Score: ${chunk.score}</span>
+                            </div>
+                            <div class="chunk-text">${chunk.text}</div>
+                        `;
+                        resultsDiv.appendChild(card);
+                    });
+                } else if (data.status === 'error') {
+                   errorMsg.textContent = data.message;
+                   errorMsg.style.display = 'block';
+                } else {
+                    errorMsg.textContent = "No raw retrieval data found for the latest query.";
+                    errorMsg.style.display = 'block';
+                }
+            } catch (err) {
+                loader.style.display = 'none';
+                errorMsg.style.display = 'block';
+                errorMsg.textContent = "Unable to connect to debug API.";
+            }
+        }
+
+        // Auto-fetch on load
+        window.onload = fetchLatest;
+    </script>
+</body>
+</html>

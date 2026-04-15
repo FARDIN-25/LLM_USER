@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Welcome</title>
+
+<style>
+    body {
+        margin: 0;
+        background: #0b1020;
+        color: white;
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+    }
+
+    .container {
+        width: 600px;
+        max-width: calc(100vw - 40px);
+        text-align: center;
+    }
+
+    h1 {
+        font-weight: 500;
+        margin-bottom: 10px;
+    }
+
+    .subtitle {
+        color: #94a3b8;
+        margin-bottom: 30px;
+    }
+
+    .info {
+        text-align: left;
+        border: 1px solid #334155;
+        padding: 16px;
+        border-radius: 10px;
+        margin-bottom: 30px;
+        background: #0f172a;
+    }
+
+    .info p {
+        margin: 0 0 10px 0;
+    }
+
+    .info ul {
+        padding-left: 18px;
+        margin: 10px 0;
+    }
+
+    .info li {
+        margin-bottom: 6px;
+    }
+
+    .buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .btn {
+        padding: 12px;
+        border-radius: 10px;
+        border: 1px solid #334155;
+        background: transparent;
+        color: white;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .btn:hover {
+        background: #1e293b;
+        border-color: #3b82f6;
+    }
+
+    .primary {
+        border-color: #3b82f6;
+    }
+</style>
+
+
+</head>
+
+<body>
+
+<div class="container">
+
+
+<h1>Welcome to FinTax AI</h1>
+
+<p class="subtitle">
+    Helping you with GST, ITR, compliance & audits
+</p>
+
+<div class="info">
+    <p><strong>We use your chats to:</strong></p>
+    <ul>
+        <li>Improve tax accuracy</li>
+        <li>Train smarter AI</li>
+        <li>Provide better financial insights</li>
+    </ul>
+
+    <p>🔒 Your data is secure and never shared externally.</p>
+</div>
+
+<h3>Can we use your chats to improve the system?</h3>
+
+<div class="buttons">
+    <button class="btn primary" onclick="submitConsent(true)">
+        Yes, improve FinTax
+    </button>
+
+    <button class="btn" onclick="submitConsent(false)">
+        No, keep my data private
+    </button>
+</div>
+
+
+</div>
+
+<script>
+async function submitConsent(consent) {
+    try {
+        const res = await fetch("/onboarding/consent", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ consent })
+        });
+
+        if (res.ok) {
+            window.location.href = "/onboarding/user-details";
+        } else {
+            alert("Something went wrong");
+        }
+
+    } catch (error) {
+        console.error("Error:", error);
+    }
+}
+</script>
+
+</body>
+</html>
