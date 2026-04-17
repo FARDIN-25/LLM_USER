@@ -51,7 +51,8 @@ class RetrievalResponse(BaseModel):
 # --------------------------------------------------
 from .search_logic import (
     dense_search_pgvector,
-    hybrid_retrieve
+    hybrid_retrieve,
+    sparse_search_postgres,
 )
 
 
@@ -61,6 +62,14 @@ from .search_logic import (
 @router.post("/search", response_model=RetrievalResponse)
 def search_endpoint(payload: RetrievalRequest, db: Session = Depends(get_db)):
     try:
+        # Route the query (lookup vs semantic vs ambiguous)
+        try:
+            from src.retrieval.router import classify_query
+            route = classify_query(payload.query).get("route", "ambiguous")
+        except Exception as e:
+            logger.warning(f"Query router failed, defaulting to ambiguous: {e}")
+            route = "ambiguous"
+
         # Auto-generate embedding if not provided OR if dimension is wrong
         query_embedding = payload.query_embedding
         needs_regeneration = False
@@ -87,12 +96,93 @@ def search_endpoint(payload: RetrievalRequest, db: Session = Depends(get_db)):
             query_embedding = embedding_model.encode(payload.query).tolist()
             logger.info(f"✅ Generated {len(query_embedding)}-dimensional embedding")
         
-        results = hybrid_retrieve(
-            db=db,
-            query=payload.query,
-            query_embedding=query_embedding,
-            k=payload.k,
-        )
+        # Routed retrieval
+        if route == "lookup":
+            results = sparse_search_postgres(db, payload.query, k=payload.k * 2)
+        elif route == "semantic":
+            if not query_embedding:
+                results = sparse_search_postgres(db, payload.query, k=payload.k * 2)
+            else:
+                results = hybrid_retrieve(
+                    db=db,
+                    query=payload.query,
+                    query_embedding=query_embedding,
+                    k=payload.k,
+                )
+        else:
+            merged: List[Dict] = []
+            if query_embedding:
+                merged.extend(
+                    hybrid_retrieve(
+                        db=db,
+                        query=payload.query,
+                        query_embedding=query_embedding,
+                        k=payload.k,
+                    )
+                )
+            merged.extend(sparse_search_postgres(db, payload.query, k=payload.k * 2))
+
+            # Dedup by doc.id, keep max score
+            by_id: Dict[str, Dict] = {}
+            for r in merged:
+                did = str(r.get("doc", {}).get("id") or "")
+                if not did:
+                    continue
+                prev = by_id.get(did)
+                if prev is None or float(r.get("score") or 0) > float(prev.get("score") or 0):
+                    by_id[did] = r
+            results = sorted(by_id.values(), key=lambda x: float(x.get("score") or 0), reverse=True)[: payload.k]
+
+        # PageIndex is the 3rd retrieval source. Route controls whether it's included.
+        if results and results[0].get("doc", {}).get("content") == "NO_CONTEXT":
+            return {"results": results}
+
+        try:
+            from src.page_index_service.database import page_index_session
+            from src.page_index_service.retriever import page_index_search
+            from src.shared.config import settings
+
+            pi: List[Dict] = []
+            if settings.PAGE_INDEX_DATABASE_URL:
+                with page_index_session() as pdb:
+                    pi = page_index_search(pdb, payload.query, k=payload.k * 2)
+
+            if pi:
+                # Map PageIndex to vector_service SearchResult shape
+                pi_results: List[Dict] = []
+                for item in pi:
+                    pi_results.append(
+                        {
+                            "doc": {
+                                "id": item.get("id"),
+                                "content": item.get("text", ""),
+                                "text": item.get("text", ""),
+                                "metadata": item.get("metadata", {}),
+                            },
+                            "score": float(item.get("score") or 0),
+                            "type": "page_index",
+                        }
+                    )
+
+                if route == "lookup":
+                    merged = list(results) + pi_results
+                elif route == "semantic":
+                    merged = list(results) + pi_results
+                else:
+                    merged = list(results) + pi_results
+
+                # Dedup by doc.id, keep max score
+                by_id: Dict[str, Dict] = {}
+                for r in merged:
+                    did = str(r.get("doc", {}).get("id") or "")
+                    if not did:
+                        continue
+                    prev = by_id.get(did)
+                    if prev is None or float(r.get("score") or 0) > float(prev.get("score") or 0):
+                        by_id[did] = r
+                results = sorted(by_id.values(), key=lambda x: float(x.get("score") or 0), reverse=True)[: payload.k]
+        except Exception as e:
+            logger.warning(f"PageIndex retrieval skipped/failed: {e}")
         
         return {"results": results}
 

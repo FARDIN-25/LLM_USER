@@ -1,4 +1,4 @@
-from typing import List, Dict, Optional, Any, TypedDict
+from typing import List, Dict, Optional, Any, TypedDict, Union, Tuple, overload, Literal
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 import logging
@@ -23,13 +23,23 @@ class SearchResult(TypedDict):
 # --------------------------------------------------
 # 🔹 Sparse Search (PostgreSQL FTS)
 # --------------------------------------------------
-def sparse_search_postgres(db: Session, query: str, k: int = 5) -> List[SearchResult]:
+@overload
+def sparse_search_postgres(db: Session, query: str, k: int = 5, *, with_meta: Literal[False] = False) -> List[SearchResult]: ...
+
+
+@overload
+def sparse_search_postgres(db: Session, query: str, k: int = 5, *, with_meta: Literal[True]) -> Dict[str, Any]: ...
+
+
+def sparse_search_postgres(
+    db: Session, query: str, k: int = 5, *, with_meta: bool = False
+) -> Union[List[SearchResult], Dict[str, Any]]:
     """
     Keyword search using websearch_to_tsquery across balance tables.
     Normalization: score = rank / (rank + 1)
     """
     if not query or query.strip() == "":
-        return []
+        return {"results": [], "meta": []} if with_meta else []
 
     logger.info(f"🔍 Sparse search (FTS) k={k}: '{query}'")
     
@@ -87,7 +97,8 @@ def sparse_search_postgres(db: Session, query: str, k: int = 5) -> List[SearchRe
                     "domain": r.domain,
                     "source_file": r.source_file,
                     "chunk_hash": r.chunk_hash,
-                    "source": r.source
+                    "source": r.source,
+                    "raw_rank": float(r.raw_rank or 0),
                 },
             },
             "score": norm_score,
@@ -95,7 +106,37 @@ def sparse_search_postgres(db: Session, query: str, k: int = 5) -> List[SearchRe
         })
         
     logger.info(f"FTS Query: {query}, Results: {len(results)}")
-    return results
+    if not with_meta:
+        return results
+
+    ids_by_table: Dict[str, List[int]] = {"docs_chunks": [], "book_chunks": []}
+    for r in results:
+        doc_id = str((r.get("doc") or {}).get("id") or "")
+        if "_" in doc_id:
+            src, raw_id = doc_id.split("_", 1)
+            try:
+                rid = int(raw_id)
+            except Exception:
+                continue
+            if src == "docs":
+                ids_by_table["docs_chunks"].append(rid)
+            elif src == "book":
+                ids_by_table["book_chunks"].append(rid)
+
+    meta: List[Dict[str, Any]] = [
+        {"type": "fts", "table": "docs_chunks", "ids": ids_by_table["docs_chunks"], "count": len(ids_by_table["docs_chunks"])},
+        {"type": "fts", "table": "book_chunks", "ids": ids_by_table["book_chunks"], "count": len(ids_by_table["book_chunks"])},
+    ]
+    return {"results": results, "meta": meta}
+
+
+def sparse_search_postgres_with_meta(
+    db: Session, query: str, k: int = 5
+) -> Dict[str, Any]:
+    """
+    Backward-compatible wrapper that returns both results and retrieval metadata.
+    """
+    return sparse_search_postgres(db, query, k, with_meta=True)  # type: ignore[return-value]
 
 
 # --------------------------------------------------
@@ -160,13 +201,44 @@ def dense_search_pgvector(db: Session, query_embedding: List[float], k: int = 5)
                     "domain": r.domain,
                     "source_file": r.source_file,
                     "chunk_hash": r.chunk_hash,
-                    "source": r.source
+                    "source": r.source,
+                    "raw_distance": float(r.distance or 0),
                 },
             },
             "score": norm_score,
             "type": "dense",
         })
     return results
+
+
+def dense_search_pgvector_with_meta(
+    db: Session, query_embedding: List[float], k: int = 5
+) -> Dict[str, Any]:
+    results = dense_search_pgvector(db, query_embedding, k)
+    ids_by_table: Dict[str, List[int]] = {"docs_chunks": [], "book_chunks": []}
+    for r in results:
+        doc_id = str((r.get("doc") or {}).get("id") or "")
+        if "_" in doc_id:
+            src, raw_id = doc_id.split("_", 1)
+            try:
+                rid = int(raw_id)
+            except Exception:
+                continue
+            if src == "docs":
+                ids_by_table["docs_chunks"].append(rid)
+            elif src == "book":
+                ids_by_table["book_chunks"].append(rid)
+
+    meta = []
+    if ids_by_table["docs_chunks"]:
+        meta.append(
+            {"type": "vector", "table": "docs_chunks", "ids": ids_by_table["docs_chunks"], "count": len(ids_by_table["docs_chunks"])}
+        )
+    if ids_by_table["book_chunks"]:
+        meta.append(
+            {"type": "vector", "table": "book_chunks", "ids": ids_by_table["book_chunks"], "count": len(ids_by_table["book_chunks"])}
+        )
+    return {"results": results, "meta": meta}
 
 def hybrid_retrieve(
     db: Session,
@@ -327,4 +399,28 @@ def hybrid_retrieve(
         }]
 
     return final_top_k
+
+
+def hybrid_retrieve_with_meta(
+    db: Session,
+    query: str,
+    query_embedding: List[float],
+    k: int = 5,
+) -> Dict[str, Any]:
+    """
+    Hybrid retrieval returning both results and metadata.
+    """
+    results = hybrid_retrieve(db=db, query=query, query_embedding=query_embedding, k=k)
+
+    dense_pack = dense_search_pgvector_with_meta(db, query_embedding, k * 2)
+    sparse_pack = sparse_search_postgres(db, query, k * 2, with_meta=True)
+
+    meta: List[Dict[str, Any]] = []
+    meta.extend(dense_pack.get("meta", []))
+    meta.extend((sparse_pack or {}).get("meta", []) if isinstance(sparse_pack, dict) else [])
+
+    return {"results": results, "meta": meta}
+
+
+ 
 

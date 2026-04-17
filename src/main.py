@@ -260,6 +260,50 @@ async def lifespan(app: FastAPI):
 
             logger.info("🚀 Database check completed successfully")
 
+        # -------------------------------------------------
+        # Optional: PageIndex DB check (fts_testing.page_index_jobs)
+        # -------------------------------------------------
+        try:
+            page_db_url = (getattr(settings, "PAGE_INDEX_DATABASE_URL", "") or "").strip()
+            if page_db_url:
+                from sqlalchemy import create_engine as _create_engine
+
+                page_engine = _create_engine(
+                    page_db_url,
+                    pool_pre_ping=settings.DB_POOL_SIZE > 0,
+                    pool_size=settings.DB_POOL_SIZE if settings.DB_POOL_SIZE > 0 else None,
+                    max_overflow=settings.DB_MAX_OVERFLOW if settings.DB_POOL_SIZE > 0 else None,
+                    pool_recycle=1800,
+                    pool_timeout=15,
+                    connect_args={"connect_timeout": 10},
+                )
+
+                with page_engine.connect() as pconn:
+                    pconn.execute(text("SELECT 1"))
+                    logger.info("✅ PageIndex PostgreSQL connection successful (fts_testing)")
+
+                    table_name = "page_index_jobs"
+                    result = pconn.execute(
+                        text(
+                            """
+                            SELECT EXISTS (
+                                SELECT 1
+                                FROM information_schema.tables
+                                WHERE table_schema = 'public'
+                                  AND table_name = :table_name
+                            )
+                            """
+                        ),
+                        {"table_name": table_name},
+                    )
+                    exists = result.scalar()
+                    if exists:
+                        logger.info(f"✅ Table found: {table_name} (fts_testing)")
+                    else:
+                        logger.warning(f"⚠️  Table MISSING: {table_name} (fts_testing)")
+        except Exception as e:
+            logger.warning(f"⚠️ PageIndex DB check skipped/failed: {e}")
+
     except Exception as e:
         logger.error("❌ DATABASE STARTUP CHECK FAILED")
         logger.error(str(e))

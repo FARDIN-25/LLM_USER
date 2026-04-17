@@ -381,6 +381,165 @@
             min-width: 0;
         }
 
+        /* ================================
+           Retrieval Debug Flip Card
+        ================================ */
+        .flip-card {
+            position: relative;
+            perspective: 1200px;
+        }
+
+        .flip-card-inner {
+            position: relative;
+            width: 100%;
+            transform-style: preserve-3d;
+            transition: transform 0.45s ease;
+        }
+
+        .flip-card.flipped .flip-card-inner {
+            transform: rotateY(180deg);
+        }
+
+        .flip-face {
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+        }
+
+        .flip-back {
+            transform: rotateY(180deg);
+        }
+
+        .flip-btn {
+            position: absolute;
+            right: 8px;
+            bottom: 8px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            color: #ececf1;
+            padding: 4px 10px;
+            border-radius: 999px;
+            cursor: pointer;
+            font-size: 12px;
+            line-height: 1;
+            transition: background 0.2s, border-color 0.2s;
+            user-select: none;
+        }
+
+        .flip-btn:hover {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(25, 195, 125, 0.6);
+        }
+
+        .debug-panel {
+            margin-top: 4px;
+            padding: 10px 12px 34px 12px; /* leave space for flip button */
+            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.18);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            max-height: 280px;
+            overflow: auto;
+            font-size: 12px;
+            color: #d1d5db;
+        }
+
+        .debug-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 8px;
+            align-items: center;
+        }
+
+        .debug-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 2px 8px;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: rgba(255, 255, 255, 0.06);
+            color: #ececf1;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .debug-badge.fts { border-color: rgba(96, 165, 250, 0.6); }
+        .debug-badge.vector { border-color: rgba(167, 139, 250, 0.6); }
+        .debug-badge.pageindex { border-color: rgba(52, 211, 153, 0.6); }
+
+        .debug-kv {
+            display: inline-flex;
+            gap: 6px;
+            align-items: baseline;
+        }
+
+        .debug-kv b {
+            color: #9ca3af;
+            font-weight: 600;
+        }
+
+        .debug-pre {
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 11px;
+            color: #e5e7eb;
+            margin-top: 8px;
+        }
+
+        .debug-section {
+            margin-top: 10px;
+        }
+
+        .debug-section-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: #e5e7eb;
+            margin: 10px 0 6px 0;
+        }
+
+        .debug-table {
+            width: 100%;
+            border-collapse: collapse;
+            overflow: hidden;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.10);
+        }
+
+        .debug-table th, .debug-table td {
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            padding: 6px 8px;
+            font-size: 12px;
+            color: #d1d5db;
+            vertical-align: top;
+        }
+
+        .debug-table th {
+            color: #9ca3af;
+            font-weight: 700;
+            background: rgba(255,255,255,0.04);
+        }
+
+        .debug-row-click {
+            cursor: pointer;
+        }
+
+        .debug-row-click:hover td {
+            background: rgba(255,255,255,0.04);
+        }
+
+        .debug-detail {
+            margin-top: 8px;
+            padding: 8px 10px;
+            border-radius: 8px;
+            background: rgba(0,0,0,0.18);
+            border: 1px solid rgba(255,255,255,0.08);
+            color: #e5e7eb;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
         /* Inline edit: textarea + Save/Cancel */
         .inline-edit-wrap {
             width: 100%;
@@ -611,6 +770,39 @@
         .btn-send:disabled {
             background: #565869;
             cursor: not-allowed;
+        }
+
+        /* Retrieval debug toggle (bottom-right of input box) */
+        .debug-toggle-btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            color: #ececf1;
+            padding: 8px 12px;
+            border-radius: 999px;
+            cursor: pointer;
+            font-size: 12px;
+            line-height: 1;
+            min-width: 64px;
+            transition: background 0.2s, border-color 0.2s;
+        }
+
+        .debug-toggle-btn:hover {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(25, 195, 125, 0.6);
+        }
+
+        .debug-toggle-btn.on {
+            border-color: rgba(25, 195, 125, 0.9);
+            background: rgba(25, 195, 125, 0.12);
+        }
+
+        /* Ensure flip faces overlap properly (no layout collapse) */
+        .flip-card-inner {
+            display: grid;
+        }
+
+        .flip-face {
+            grid-area: 1 / 1;
         }
 
         /* Thinking indicator (Fintax-style): text-based, no dots. Fade-in + pulse + border glow + text fade wave. */
@@ -1261,6 +1453,7 @@
         // isChatStarted: at least one message sent in this view → hide toggle
         let isChatStarted = false;
 
+
         /**
          * Toggle visibility and state (ChatGPT-style).
          * - No conversation yet: toggle visible, enabled.
@@ -1287,6 +1480,8 @@
                 el.classList.remove("toggle-disabled");
             }
         }
+
+        // Retrieval visualization is always attached by backend.
 
         // ===============================
         // Welcome Phrase System
@@ -2146,6 +2341,184 @@
 
             const editedLabel = (role === 'user' && isEdited) ? '<span class="message-edited-label">(edited)</span>' : '';
             const bodyContent = formatMessageContent(content);
+            const vizObj = (role === 'assistant' && options && (options.viz || options.debug)) ? (options.viz || options.debug) : null;
+
+            function escapeAttr(str) {
+                return (str || '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+            }
+
+            function badgeClass(type) {
+                const t = String(type || '').toLowerCase();
+                if (t === 'fts') return 'fts';
+                if (t === 'vector') return 'vector';
+                if (t === 'pageindex') return 'pageindex';
+                return '';
+            }
+
+            function renderVizPanel(viz) {
+                if (!viz) return '';
+                const retrievals = Array.isArray(viz.retrievals) ? viz.retrievals : [];
+                const route = viz.route || 'unknown';
+                const total = viz.total_chunks != null ? viz.total_chunks : '';
+                const ctxLen = viz.context_length != null ? viz.context_length : '';
+                const llm = viz.llm || 'mistral';
+                const model = viz.model || '';
+                const notes = viz.notes || viz.note || '';
+                const kbChars = viz.kb_chars != null ? viz.kb_chars : '';
+                const llmChars = viz.llm_chars != null ? viz.llm_chars : '';
+                const kbRatio = viz.kb_ratio != null ? Math.round(Number(viz.kb_ratio) * 100) : null;
+
+                const badges = retrievals.map(r => {
+                    const type = (r && r.type) ? String(r.type) : 'retrieval';
+                    const table = (r && r.table) ? String(r.table) : '';
+                    return `<span class="debug-badge ${badgeClass(type)}">[${escapeHtml(type.toUpperCase())}] ${escapeHtml(table)}</span>`;
+                }).join(' ');
+
+                function safeJson(obj) {
+                    try { return JSON.stringify(obj || {}, null, 2); } catch (e) { return String(obj || ''); }
+                }
+
+                function toArray(v) { return Array.isArray(v) ? v : []; }
+
+                // Build a UI table view for PageIndex rows when present.
+                // Expect: debug.pageindex_rows = [{ id, score, row, text, ... }]
+                const pageRows = toArray(viz.pageindex_rows);
+                const hasPageRows = pageRows.length > 0;
+
+                // KB rows (docs_chunks/book_chunks) across VECTOR/FTS/HYBRID
+                const kbRows = toArray(viz.kb_rows);
+                const hasKbRows = kbRows.length > 0;
+
+                const kbTable = hasKbRows ? `
+                    <div class="debug-section">
+                        <div class="debug-section-title">KB rows (docs_chunks / book_chunks)</div>
+                        <table class="debug-table">
+                            <thead>
+                                <tr>
+                                    <th style="width:95px">Type</th>
+                                    <th style="width:110px">Table</th>
+                                    <th style="width:90px">Row ID</th>
+                                    <th style="width:70px">Score</th>
+                                    <th>Source</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${kbRows.map((r) => {
+                                    const type = (r && r.type) ? String(r.type) : '';
+                                    const table = (r && r.table) ? String(r.table) : '';
+                                    const rid = (r && r.id) ? String(r.id) : '';
+                                    const score = (r && r.score != null) ? String(r.score) : '';
+                                    const src = (r && r.source_file) ? String(r.source_file) : '';
+                                    const packed = escapeAttr(safeJson(r));
+                                    return `<tr class="debug-row-click" onclick="selectDebugRow(this)" data-row="${packed}">
+                                                <td>${escapeHtml(type.toUpperCase())}</td>
+                                                <td>${escapeHtml(table)}</td>
+                                                <td>${escapeHtml(rid)}</td>
+                                                <td>${escapeHtml(score)}</td>
+                                                <td>${escapeHtml(src).slice(0, 80)}</td>
+                                            </tr>`;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                        <div class="debug-detail" data-debug-detail>
+                            Click a row to view the full row + text here.
+                        </div>
+                    </div>
+                ` : `
+                    <div class="debug-section">
+                        <div class="debug-section-title">KB rows (docs_chunks / book_chunks)</div>
+                        <div style="color:#9ca3af;font-size:12px;">No KB rows captured.</div>
+                    </div>
+                `;
+
+                const pageTable = hasPageRows ? `
+                    <div class="debug-section">
+                        <div class="debug-section-title">PageIndex rows (fts_testing.page_index_jobs)</div>
+                        <table class="debug-table">
+                            <thead>
+                                <tr>
+                                    <th style="width:120px">ID</th>
+                                    <th style="width:70px">Score</th>
+                                    <th>Summary</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${pageRows.map((r, idx) => {
+                                    const rid = (r && r.id) ? String(r.id) : '';
+                                    const score = (r && r.score != null) ? String(r.score) : '';
+                                    const row = (r && r.row) ? r.row : null;
+                                    const summary = row ? (
+                                        (row.query_text || row.query || row.title || row.status || row.result || '')
+                                    ) : (r.text || '');
+                                    const packed = escapeAttr(safeJson(r));
+                                    return `<tr class="debug-row-click" onclick="selectDebugRow(this)" data-row="${packed}">
+                                                <td>${escapeHtml(rid)}</td>
+                                                <td>${escapeHtml(score)}</td>
+                                                <td>${escapeHtml(String(summary)).slice(0, 140)}</td>
+                                            </tr>`;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                        <div class="debug-detail" data-debug-detail>
+                            Click a row to view the full row + text here.
+                        </div>
+                    </div>
+                ` : `
+                    <div class="debug-section">
+                        <div class="debug-section-title">PageIndex rows (fts_testing.page_index_jobs)</div>
+                        <div style="color:#9ca3af;font-size:12px;">No PageIndex matches captured for this query.</div>
+                    </div>
+                `;
+
+                const contextPanel = `
+                    <div class="debug-section">
+                        <div class="debug-section-title">Merged context sent to LLM</div>
+                        <div class="debug-detail" style="max-height:180px; overflow:auto;">${escapeHtml(String(viz.merged_context || '').slice(0, 60000))}</div>
+                    </div>
+                `;
+
+                const llmPanel = `
+                    <div class="debug-section">
+                        <div class="debug-section-title">LLM answer (raw)</div>
+                        <div class="debug-detail" style="max-height:180px; overflow:auto;">${escapeHtml(String(viz.llm_answer || ''))}</div>
+                    </div>
+                `;
+
+                const mixPanel = `
+                    <div class="debug-section">
+                        <div class="debug-section-title">KB vs LLM contribution</div>
+                        <div class="debug-row">
+                            <span class="debug-kv"><b>KB chars</b> <span>${escapeHtml(String(kbChars))}</span></span>
+                            <span class="debug-kv"><b>LLM chars</b> <span>${escapeHtml(String(llmChars))}</span></span>
+                            ${kbRatio != null ? `<span class="debug-kv"><b>KB%</b> <span>${escapeHtml(String(kbRatio))}%</span></span>` : ''}
+                        </div>
+                    </div>
+                `;
+
+                return `
+                    <div class="debug-panel">
+                        <div class="debug-row">
+                            <span class="debug-kv"><b>Route</b> <span>${escapeHtml(String(route))}</span></span>
+                            <span class="debug-kv"><b>Total</b> <span>${escapeHtml(String(total))}</span></span>
+                            <span class="debug-kv"><b>Context</b> <span>${escapeHtml(String(ctxLen))}</span></span>
+                            <span class="debug-kv"><b>LLM</b> <span>${escapeHtml(String(llm))}</span></span>
+                            ${model ? `<span class="debug-kv"><b>Model</b> <span>${escapeHtml(String(model))}</span></span>` : ''}
+                        </div>
+                        ${notes ? `<div class="debug-row"><span class="debug-kv"><b>Notes</b> <span>${escapeHtml(String(notes)).slice(0, 500)}</span></span></div>` : ''}
+                        <div class="debug-row">${badges || ''}</div>
+                        ${kbTable}
+                        ${pageTable}
+                        ${contextPanel}
+                        ${llmPanel}
+                        ${mixPanel}
+                    </div>
+                `;
+            }
 
             // Category badge for user messages
             let categoryBadge = '';
@@ -2160,13 +2533,38 @@
             // even before query_id is returned from the backend.
             const shouldWrap = (role === 'user') || (queryId != null);
             const wrapContent = shouldWrap
-                ? `<div class="message-content-wrap">
-                        <div class="message-body">
-                            ${categoryBadge}
-                            ${bodyContent}
-                        </div>
-                        ${controlsHtml}${editedLabel}
-                   </div>`
+                ? (() => {
+                    if (role === 'assistant') {
+                        const effectiveViz = vizObj || { note: 'Visualization data not available.' };
+                        const dbg = renderVizPanel(effectiveViz);
+                        const dbgAttr = escapeAttr(JSON.stringify(effectiveViz));
+                        return `
+                            <div class="message-content-wrap">
+                                <div class="message-body">
+                                    <div class="flip-card" data-debug="${dbgAttr}">
+                                        <div class="flip-card-inner">
+                                            <div class="flip-face flip-front">
+                                                ${bodyContent}
+                                            </div>
+                                            <div class="flip-face flip-back">
+                                                ${dbg}
+                                            </div>
+                                        </div>
+                                        <button type="button" class="flip-btn" onclick="toggleFlip(this)">Flip</button>
+                                    </div>
+                                </div>
+                                ${controlsHtml}${editedLabel}
+                            </div>
+                        `;
+                    }
+                    return `<div class="message-content-wrap">
+                            <div class="message-body">
+                                ${categoryBadge}
+                                ${bodyContent}
+                            </div>
+                            ${controlsHtml}${editedLabel}
+                       </div>`;
+                })()
                 : bodyContent;
 
             // Emoji picker below each bot message; one active emoji per message
@@ -2195,6 +2593,37 @@
             messagesArea.scrollTop = messagesArea.scrollHeight;
 
             messageHistory.push({ role, content, files, messageId, reactionEmoji, queryId, responseId, isEdited });
+        }
+
+        function toggleFlip(btn) {
+            try {
+                const card = btn.closest('.flip-card');
+                if (!card) return;
+                card.classList.toggle('flipped');
+                btn.textContent = card.classList.contains('flipped') ? 'Back' : 'Flip';
+            } catch (e) {
+                console.warn('Flip failed:', e);
+            }
+        }
+
+        function selectDebugRow(tr) {
+            try {
+                const panel = tr.closest('.debug-panel');
+                if (!panel) return;
+                const detail = panel.querySelector('[data-debug-detail]');
+                if (!detail) return;
+                const raw = tr.getAttribute('data-row') || '';
+                let obj = null;
+                try { obj = JSON.parse(raw); } catch (e) { obj = raw; }
+
+                // Prefer showing row then text underneath
+                const row = (obj && obj.row) ? obj.row : null;
+                const text = (obj && obj.text) ? obj.text : '';
+                const rowPretty = row ? JSON.stringify(row, null, 2) : '(no row data)';
+                detail.textContent = rowPretty + (text ? ("\n\n--- TEXT ---\n" + String(text)) : '');
+            } catch (e) {
+                console.warn('selectDebugRow failed', e);
+            }
         }
 
         function formatMessageContent(text) {
@@ -2452,7 +2881,7 @@
                 }
 
                 // Add assistant message with query_id/response_id for regenerate + copy controls
-                addMessage('assistant', answerText, [], messageId, 'no_react', { queryId: data.query_id, responseId: data.response_id });
+                addMessage('assistant', answerText, [], messageId, 'no_react', { queryId: data.query_id, responseId: data.response_id, viz: data.viz || data.debug || null });
                 // Patch the user message we added earlier (no query_id yet) with ids and controls
                 patchLastUserMessageWithIds(data.query_id, data.response_id, question, data.category || null);
 

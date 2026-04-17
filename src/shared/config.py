@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     
     # Database
     DATABASE_URL: str = Field(..., description="PostgreSQL Connection String")
+    PAGE_INDEX_DATABASE_URL: str = Field(
+        "",
+        description="Optional Postgres URL for PageIndex jobs table (e.g., fts_testing.page_index_jobs)",
+    )
     DB_POOL_SIZE: int = 2
     DB_MAX_OVERFLOW: int = 4
     DB_POOL_PRE_PING: bool = True

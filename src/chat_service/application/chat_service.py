@@ -23,7 +23,7 @@ from src.rag_service.infrastructure.prompt_templates import (
 from src.followup_service.infrastructure.history_repository import HistoryRepository
 from src.followup_service.application.followup_pipeline import FollowupPipeline
 from src.rag_service.domain.intent_classifier import IntentClassifier
-from src.vector_service.infrastructure.search_logic import hybrid_retrieve
+from src.vector_service.infrastructure.search_logic import hybrid_retrieve, sparse_search_postgres
 
 logger = logging.getLogger("fintax")
 
@@ -31,6 +31,29 @@ logger = logging.getLogger("fintax")
 MAX_CONTEXT_CHARS = 5000
 MAX_CHUNKS_FOR_CONTEXT = 5
 MAX_CHUNK_CHARS = 1000
+# RRF scores are small (often ~0.01–0.03). This gate is only to block "dense-only noise".
+MIN_RRF_SCORE_TO_ANSWER = 0.012
+
+
+def _apply_acronym_expansions(query: str) -> str:
+    """
+    Expand common tax/compliance acronyms to improve sparse (FTS) recall.
+    Kept intentionally small + deterministic to avoid query drift.
+    """
+    q = (query or "").strip()
+    if not q:
+        return ""
+    expansions = {
+        "roc": "Registrar of Companies",
+        "itr": "Income Tax Return",
+        "tds": "Tax Deducted at Source",
+        "itc": "Input Tax Credit",
+        "gstr": "Goods and Services Tax Return",
+    }
+    out = q
+    for acr, phrase in expansions.items():
+        out = re.sub(rf"\b{re.escape(acr)}\b", f"{acr.upper()} ({phrase})", out, flags=re.IGNORECASE)
+    return out
 
 
 def _detect_category_safe(question: str) -> str:
@@ -250,6 +273,7 @@ class ChatService:
         query_expansion_enabled: bool = True,
         expansion_strategy: Optional[str] = None,
         use_legacy_retrieval: bool = False,
+        debug: bool = True,
     ) -> Dict[str, Any]:
         start_time = time.time()
         raw_question = payload.get_question_text()
@@ -310,6 +334,7 @@ class ChatService:
         chunks: List[Dict[str, Any]] = []
         important_words: List[str] = []
         answer_data: Optional[Dict[str, Any]] = None
+        viz: Optional[Dict[str, Any]] = None
 
         try:
             expanded_query, important_words = await self._expand_query(
@@ -317,6 +342,7 @@ class ChatService:
                 query_expansion_enabled,
                 expansion_strategy,
             )
+            expanded_query = _apply_acronym_expansions(expanded_query)
 
             # --- HYBRID RETRIEVAL BYPASS ---
             if intent in ["greeting", "identity"]:
@@ -324,15 +350,22 @@ class ChatService:
                 chunks = []
                 important_words = []
             else:
-                chunks = await self._retrieve_documents(
+                chunks_result = await self._retrieve_documents(
                     original_query=question,
-                    search_query=rewritten_question,
+                    # IMPORTANT: Use expanded query for retrieval (previously computed but unused).
+                    search_query=(expanded_query or rewritten_question),
                     limit=limit,
                     reranking_enabled=reranking_enabled,
                     hybrid_retrieval_enabled=hybrid_retrieval_enabled,
                     intent=intent,
-                    use_legacy=use_legacy_retrieval
+                    use_legacy=use_legacy_retrieval,
+                    debug=True,
                 )
+                if isinstance(chunks_result, dict):
+                    chunks = chunks_result.get("chunks", [])
+                    viz = chunks_result.get("viz")
+                else:
+                    chunks = chunks_result  # type: ignore[assignment]
 
             # --- DEBUG: Capture Raw Retrieval Results ---
             raw_retrieval_debug = [
@@ -370,6 +403,7 @@ class ChatService:
                     "category": payload.category,
                     "rewritten_query": rewritten_question,
                     "raw_retrieval": raw_retrieval_debug,
+                    **({"viz": viz} if viz is not None else {}),
                 }
 
             # ✅ STEP 3 — RERANKING
@@ -391,6 +425,7 @@ class ChatService:
             )
 
             context = self._build_context(chunks)
+            context_length = len(context or "")
             
             # --- FIX TOPIC STICKINESS (IN-BETWEEN QUESTIONS) ---
             # If the best search score is very low AND the intent is not a general one, 
@@ -415,6 +450,23 @@ class ChatService:
                 session_metadata=merged_metadata,
                 intent=intent
             )
+
+            # Enrich visualization payload with LLM + context stats
+            if viz is not None and answer_data is not None:
+                usage = answer_data.get("usage") or {}
+                viz["context_length"] = context_length
+                viz["llm"] = "mistral" if settings.MISTRAL_ENABLED else "disabled"
+                viz["model"] = answer_data.get("model")
+                viz["tokens"] = usage if isinstance(usage, dict) else {}
+                viz["prompt_length"] = int(answer_data.get("_prompt_length") or 0)
+                viz["merged_context"] = context
+                viz["llm_answer"] = answer_data.get("answer", "")
+                kb_chars = int(context_length or 0)
+                llm_chars = len(answer_data.get("answer", "") or "")
+                total_chars = kb_chars + llm_chars
+                viz["kb_chars"] = kb_chars
+                viz["llm_chars"] = llm_chars
+                viz["kb_ratio"] = (kb_chars / total_chars) if total_chars > 0 else 0.0
 
             # Store debug data in metadata
             if answer_data:
@@ -472,6 +524,7 @@ class ChatService:
             "category": payload.category,
             "rewritten_query": rewritten_question,
             "is_followup": is_followup,
+            **({"viz": viz} if viz is not None else {}),
         }
 
     def _ensure_session(self, payload: schemas.QueryCreate):
@@ -535,7 +588,8 @@ class ChatService:
         reranking_enabled: bool,
         hybrid_retrieval_enabled: bool,
         intent: str = "GENERAL",
-        use_legacy: bool = False
+        use_legacy: bool = False,
+        debug: bool = True,
     ) -> List[Dict]:
         """Wrapper for improved RRF retrieval with fallback to legacy logic."""
         if use_legacy:
@@ -543,39 +597,326 @@ class ChatService:
                 original_query, search_query, limit, reranking_enabled, hybrid_retrieval_enabled, intent
             )
 
-        # Use new RRF retrieval
+        # Route the query (lookup vs semantic vs ambiguous)
+        try:
+            from src.retrieval.router import classify_query
+            routing = classify_query(search_query)
+            route = routing.get("route", "ambiguous")
+            routing_confidence = routing.get("confidence", 0)
+            routing_scores = {
+                "lookup_score": routing.get("lookup_score", 0),
+                "semantic_score": routing.get("semantic_score", 0),
+            }
+        except Exception as e:
+            logger.warning(f"Query router failed, defaulting to ambiguous: {e}")
+            route = "ambiguous"
+            routing_confidence = 0
+            routing_scores = {"lookup_score": 0, "semantic_score": 0}
+
+        def _map_search_logic_results(results: List[Dict]) -> List[Dict]:
+            mapped: List[Dict] = []
+            for r in results:
+                if r.get("doc", {}).get("content") == "NO_CONTEXT":
+                    return [r]
+                doc = r.get("doc", {})
+                mapped.append(
+                    {
+                        "text": doc.get("content", ""),
+                        "score": float(r.get("score") or 0),
+                        "id": doc.get("id"),
+                        "source": doc.get("metadata", {}).get("source", "unknown"),
+                        "metadata": doc.get("metadata", {}),
+                    }
+                )
+            return mapped
+
+        # Use scoring-based routing to choose retrieval
         query_embedding = None
-        if self.embedding_model:
+        if route in ("semantic", "ambiguous") and self.embedding_model:
             try:
                 query_embedding = self.embedding_model.encode(search_query).tolist()
             except Exception as e:
-                logger.error(f"Embedding generation failed for RRF: {e}")
+                logger.error(f"Embedding generation failed for routed retrieval: {e}")
 
         try:
-            results = hybrid_retrieve(
-                db=self.db,
-                query=search_query,
-                query_embedding=query_embedding,
-                k=limit
-            )
-            
-            # Map search_logic.SearchResult back to ChatService's expected format
-            # search_logic returns format: {"doc": {"id":..., "content":..., "metadata":...}, "score":..., "type":...}
-            # ChatService expects: {"text":..., "score":..., "id":..., "source":...}
-            mapped_results = []
-            for r in results:
-                if r.get("doc", {}).get("content") == "NO_CONTEXT":
-                    return [r] # Keep NO_CONTEXT as is
-                    
-                doc = r.get("doc", {})
-                mapped_results.append({
-                    "text": doc.get("content", ""),
-                    "score": float(r.get("score") or 0),
-                    "id": doc.get("id"),
-                    "source": doc.get("metadata", {}).get("source", "unknown"),
-                    "metadata": doc.get("metadata", {})
-                })
-            return mapped_results
+            mapped_results: List[Dict] = []
+            retrieval_metas: List[Dict] = []
+            kb_rows: List[Dict[str, Any]] = []
+            fts_count = 0
+
+            def _add_kb_rows(results: List[Dict], retrieval_type: str):
+                """
+                Convert search_logic SearchResult list to lightweight row records for UI.
+                """
+                for r in results[: max(0, limit * 2)]:
+                    doc = (r.get("doc") or {}) if isinstance(r, dict) else {}
+                    doc_id = str(doc.get("id") or "")
+                    meta = (doc.get("metadata") or {}) if isinstance(doc.get("metadata"), dict) else {}
+                    text_val = str(doc.get("content") or "")
+                    table = None
+                    row_id = None
+                    if "_" in doc_id:
+                        src, raw_id = doc_id.split("_", 1)
+                        if src == "docs":
+                            table = "docs_chunks"
+                        elif src == "book":
+                            table = "book_chunks"
+                        row_id = raw_id
+                    kb_rows.append(
+                        {
+                            "type": retrieval_type,
+                            "table": table or "unknown",
+                            "id": row_id or doc_id,
+                            "score": float(r.get("score") or 0) if isinstance(r, dict) else 0.0,
+                            "source_file": meta.get("source_file"),
+                            "domain": meta.get("domain"),
+                            "chunk_hash": meta.get("chunk_hash"),
+                            "row": meta,
+                            "text": text_val,
+                        }
+                    )
+
+            def _add_pageindex_rows(pi_results: List[Dict[str, Any]]):
+                for item in (pi_results or [])[: max(0, limit * 2)]:
+                    meta = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
+                    kb_rows.append(
+                        {
+                            "type": "pageindex",
+                            "table": "page_index_jobs",
+                            "id": str(item.get("id") or ""),
+                            "score": float(item.get("score") or 0),
+                            "source_file": meta.get("source_file") or meta.get("source"),
+                            "domain": meta.get("domain"),
+                            "chunk_hash": meta.get("chunk_hash"),
+                            "row": meta,
+                            "text": str(item.get("text") or ""),
+                        }
+                    )
+
+            def _map_pageindex_to_mapped(pi_results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+                mapped: List[Dict[str, Any]] = []
+                for item in (pi_results or []):
+                    txt = str(item.get("text") or "").strip()
+                    if not txt:
+                        continue
+                    mapped.append(
+                        {
+                            "text": txt,
+                            "score": float(item.get("score") or 0),
+                            "id": item.get("id"),
+                            "source": item.get("source", "page_index_jobs"),
+                            "metadata": item.get("metadata", {}) if isinstance(item.get("metadata"), dict) else {},
+                        }
+                    )
+                return mapped
+
+            # Always run base retrieval signals for visualization (VECTOR + FTS)
+            # These rows are for UI display, regardless of which route is ultimately used.
+            try:
+                from src.vector_service.infrastructure.search_logic import sparse_search_postgres_with_meta, dense_search_pgvector_with_meta
+
+                fts_pack = sparse_search_postgres_with_meta(self.db, search_query, k=limit * 2)
+                fts_results = fts_pack.get("results", [])
+                fts_count = len(fts_results) if isinstance(fts_results, list) else 0
+                retrieval_metas.extend(fts_pack.get("meta", []))
+                _add_kb_rows(fts_results, "fts")
+
+                if self.embedding_model:
+                    try:
+                        emb = self.embedding_model.encode(search_query).tolist()
+                    except Exception:
+                        emb = None
+                    if emb:
+                        vec_pack = dense_search_pgvector_with_meta(self.db, emb, k=limit * 2)
+                        vec_results = vec_pack.get("results", [])
+                        retrieval_metas.extend(vec_pack.get("meta", []))
+                        _add_kb_rows(vec_results, "vector")
+            except Exception as e:
+                logger.warning(f"KB visualization retrieval failed: {e}")
+
+            # PageIndex retrieval (3rd source) - route decides whether it participates in final answer,
+            # but we always try to fetch it for debugging + optionally for final merge.
+            pi_pack: Optional[Dict[str, Any]] = None
+            pi_results: List[Dict[str, Any]] = []
+            try:
+                from src.page_index_service.database import page_index_session
+                from src.page_index_service.retriever import page_index_search_with_meta
+                from src.shared.config import settings
+
+                if settings.PAGE_INDEX_DATABASE_URL:
+                    with page_index_session() as pdb:
+                        pi_pack = page_index_search_with_meta(pdb, search_query, k=limit * 2)
+                    if isinstance(pi_pack, dict):
+                        pi_results = (pi_pack.get("results") or []) if isinstance(pi_pack.get("results"), list) else []
+                        retrieval_metas.append(pi_pack.get("meta", {}))
+                        _add_pageindex_rows(pi_results)
+            except Exception as e:
+                logger.warning(f"PageIndex retrieval failed: {e}")
+
+            if route == "lookup":
+                if debug:
+                    from src.vector_service.infrastructure.search_logic import sparse_search_postgres_with_meta
+                    pack = sparse_search_postgres_with_meta(self.db, search_query, k=limit * 2)
+                    sparse = pack.get("results", [])
+                    # metas/rows already captured above; keep for safety if base retrieval failed
+                    if not retrieval_metas:
+                        retrieval_metas.extend(pack.get("meta", []))
+                        _add_kb_rows(sparse, "fts")
+                else:
+                    sparse = sparse_search_postgres(self.db, search_query, k=limit * 2)
+                # lookup => FTS + PageIndex (both are "lookup" sources)
+                merged_lookup = _map_search_logic_results(sparse) + _map_pageindex_to_mapped(pi_results)
+                # Deduplicate by id, keep max score
+                by_id: Dict[str, Dict] = {}
+                for item in merged_lookup:
+                    iid = str(item.get("id") or "")
+                    if not iid:
+                        continue
+                    prev = by_id.get(iid)
+                    if prev is None or float(item.get("score") or 0) > float(prev.get("score") or 0):
+                        by_id[iid] = item
+                mapped_results = sorted(by_id.values(), key=lambda d: float(d.get("score") or 0), reverse=True)[:limit]
+            elif route == "semantic":
+                if not query_embedding:
+                    # If embedding unavailable, degrade gracefully to FTS
+                    if debug:
+                        from src.vector_service.infrastructure.search_logic import sparse_search_postgres_with_meta
+                        pack = sparse_search_postgres_with_meta(self.db, search_query, k=limit * 2)
+                        sparse = pack.get("results", [])
+                        if not retrieval_metas:
+                            retrieval_metas.extend(pack.get("meta", []))
+                            _add_kb_rows(sparse, "fts")
+                    else:
+                        sparse = sparse_search_postgres(self.db, search_query, k=limit * 2)
+                    merged_sem = _map_search_logic_results(sparse) + _map_pageindex_to_mapped(pi_results)
+                    by_id: Dict[str, Dict] = {}
+                    for item in merged_sem:
+                        iid = str(item.get("id") or "")
+                        if not iid:
+                            continue
+                        prev = by_id.get(iid)
+                        if prev is None or float(item.get("score") or 0) > float(prev.get("score") or 0):
+                            by_id[iid] = item
+                    mapped_results = sorted(by_id.values(), key=lambda d: float(d.get("score") or 0), reverse=True)[:limit]
+                else:
+                    if debug:
+                        from src.vector_service.infrastructure.search_logic import hybrid_retrieve_with_meta
+                        pack = hybrid_retrieve_with_meta(self.db, search_query, query_embedding, k=limit)
+                        results = pack.get("results", [])
+                        retrieval_metas.extend(pack.get("meta", []))
+                        # Hybrid results contain merged scoring; still show them as "hybrid"
+                        _add_kb_rows(results, "hybrid")
+                    else:
+                        results = hybrid_retrieve(
+                            db=self.db,
+                            query=search_query,
+                            query_embedding=query_embedding,
+                            k=limit,
+                        )
+                    mapped_hybrid = _map_search_logic_results(results)
+                    merged_sem = mapped_hybrid + _map_pageindex_to_mapped(pi_results)
+                    # Deduplicate by id, keep max score
+                    by_id: Dict[str, Dict] = {}
+                    for item in merged_sem:
+                        iid = str(item.get("id") or "")
+                        if not iid:
+                            continue
+                        prev = by_id.get(iid)
+                        if prev is None or float(item.get("score") or 0) > float(prev.get("score") or 0):
+                            by_id[iid] = item
+                    mapped_results = sorted(by_id.values(), key=lambda d: float(d.get("score") or 0), reverse=True)[:limit]
+            else:
+                # ambiguous -> Hybrid + FTS + PageIndex then merge
+                hybrid = []
+                if query_embedding:
+                    if debug:
+                        from src.vector_service.infrastructure.search_logic import hybrid_retrieve_with_meta
+                        pack = hybrid_retrieve_with_meta(self.db, search_query, query_embedding, k=limit)
+                        hybrid = pack.get("results", [])
+                        retrieval_metas.extend(pack.get("meta", []))
+                        _add_kb_rows(hybrid, "hybrid")
+                    else:
+                        hybrid = hybrid_retrieve(
+                            db=self.db,
+                            query=search_query,
+                            query_embedding=query_embedding,
+                            k=limit,
+                        )
+                if debug:
+                    from src.vector_service.infrastructure.search_logic import sparse_search_postgres_with_meta
+                    sp = sparse_search_postgres_with_meta(self.db, search_query, k=limit * 2)
+                    sparse = sp.get("results", [])
+                    if not retrieval_metas:
+                        retrieval_metas.extend(sp.get("meta", []))
+                        _add_kb_rows(sparse, "fts")
+                else:
+                    sparse = sparse_search_postgres(self.db, search_query, k=limit * 2)
+                mapped_hybrid = _map_search_logic_results(hybrid)
+                merged = mapped_hybrid + _map_search_logic_results(sparse) + _map_pageindex_to_mapped(pi_results)
+
+                # Deduplicate by id, keep max score
+                by_id: Dict[str, Dict] = {}
+                for item in merged:
+                    iid = str(item.get("id") or "")
+                    if not iid:
+                        continue
+                    prev = by_id.get(iid)
+                    if prev is None or float(item.get("score") or 0) > float(prev.get("score") or 0):
+                        by_id[iid] = item
+                mapped_results = sorted(by_id.values(), key=lambda d: float(d.get("score") or 0), reverse=True)[:limit]
+
+            # Grounding gate: if retrieval is weak (dense-only) and FTS is empty, force NO_CONTEXT
+            # This is the main anti-hallucination guard for out-of-KB questions.
+            def _no_context_viz(note: str) -> Dict[str, Any]:
+                # Normalize route naming to requested UI labels
+                ui_route = "hybrid" if route == "ambiguous" else route
+                return {
+                    "route": ui_route,
+                    "confidence": int(routing_confidence or 0),
+                    **routing_scores,
+                    "retrievals": [m for m in retrieval_metas if isinstance(m, dict) and m.get("table")],
+                    "total_chunks": 0,
+                    "kb_rows": kb_rows,
+                    "pageindex_rows": pi_results,
+                    "notes": note,
+                }
+
+            if not mapped_results:
+                return {
+                    "chunks": [{"doc": {"content": "NO_CONTEXT", "metadata": {}}, "score": 0, "type": "none"}],
+                    "viz": _no_context_viz("NO_CONTEXT: no results after routing/merge"),
+                }
+
+            top_score = float(mapped_results[0].get("score") or 0) if mapped_results else 0.0
+            if fts_count == 0 and top_score < MIN_RRF_SCORE_TO_ANSWER:
+                return {
+                    "chunks": [{"doc": {"content": "NO_CONTEXT", "metadata": {}}, "score": 0, "type": "none"}],
+                    "viz": _no_context_viz(
+                        f"NO_CONTEXT: weak retrieval (fts_count=0, top_score={top_score:.6f} < {MIN_RRF_SCORE_TO_ANSWER})"
+                    ),
+                }
+
+            # Build the visualization payload (always attached)
+            total_chunks = len(mapped_results)
+            # Normalize route naming to requested UI labels
+            ui_route = "hybrid" if route == "ambiguous" else route
+
+            viz_obj = {
+                "route": ui_route,
+                "confidence": int(routing_confidence or 0),
+                **routing_scores,
+                "retrievals": [m for m in retrieval_metas if isinstance(m, dict) and m.get("table")],
+                "total_chunks": total_chunks,
+                "kb_rows": kb_rows,
+                "pageindex_rows": pi_results,
+                "notes": (
+                    "lookup → FTS + PageIndex"
+                    if route == "lookup"
+                    else ("semantic → Hybrid (vector+FTS) + PageIndex" if route == "semantic" else "hybrid → Hybrid + FTS + PageIndex")
+                ),
+            }
+
+            return {"chunks": mapped_results, "viz": viz_obj}
             
         except Exception as e:
             logger.error(f"New RRF retrieval failed, falling back to legacy: {e}")
@@ -809,19 +1150,28 @@ class ChatService:
                 from src.rag_service.infrastructure.mistral import async_call_mistral_chat
                 response = await async_call_mistral_chat(prompt, settings.MISTRAL_API_KEY, llm_model)
                 answer = clean_markdown_formatting(response.get("content", ""))
+                usage = response.get("usage") or {}
+                llm_model = response.get("model") or llm_model
             except Exception as e:
                 logger.error(f"LLM failed: {e}")
                 answer = f"Fallback context:\n{context[:500]}"
+                usage = {}
         else:
             answer = f"Fallback context:\n{context[:500]}"
+            usage = {}
+
+        # Never return an empty answer (frontend shows ". no answer provided ...")
+        if not (answer or "").strip():
+            answer = "System temporary issue. Please try again."
 
         # FIX: Always return tags and language_response so callers never get KeyError
         return {
             "answer": answer,
-            "usage": {},
+            "usage": usage if isinstance(usage, dict) else {},
             "model": llm_model,
             "tags": [],
             "language_response": {},
+            "_prompt_length": len(prompt),
         }
 
     def _save_response(self, query_row, answer_data, chunks, start_time, retrieval_method="dense"):
@@ -869,9 +1219,18 @@ class ChatService:
         response_row = crud.get_response_by_query_id(self.db, query_id)
         if not query_row or not response_row:
             raise HTTPException(status_code=404)
-        chunks = await self._retrieve_documents(
+        retrieved = await self._retrieve_documents(
             query_row.query_text, query_row.query_text, 5, True, True
         )
+
+        viz = None
+        chunks = []
+        if isinstance(retrieved, dict):
+            viz = retrieved.get("viz")
+            chunks = retrieved.get("chunks", []) or []
+        else:
+            chunks = retrieved or []
+
         context = self._build_context(chunks)
         answer_data = await self._generate_answer(query_row.query_text, context, chunks, [])
         crud.update_response_content(
@@ -885,6 +1244,7 @@ class ChatService:
             "answer": answer_data["answer"],
             "query_id": query_id,
             "response_id": response_row.id,
+            **({"viz": viz} if viz is not None else {}),
         }
 
     # =============================================================================

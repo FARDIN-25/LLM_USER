@@ -84,7 +84,8 @@ async def chat(
             reranker_type=reranker_type,
             limit=limit,
             hybrid_retrieval_enabled=hybrid_retrieval_enabled,
-            query_expansion_enabled=True  # Default for chat endpoint
+            query_expansion_enabled=True,  # Default for chat endpoint
+            debug=True,
         )
 
         # Return format expected by frontend (session_id from active session)
@@ -100,6 +101,7 @@ async def chat(
             "message_id": result.get("message_id"),
             "session_id": result.get("session_id"),
             "category": result.get("category"),
+            **({"viz": result.get("viz")} if result.get("viz") is not None else {}),
         }
 
     except HTTPException:
@@ -151,7 +153,7 @@ async def query_rag(
     reranking_enabled: bool = Query(True),
     hybrid_retrieval_enabled: bool = Query(True),
     reranker_type: str = Query(None, description="Reranker type: cross-encoder, cohere, bge, or llm"),
-    limit: int = Query(5)
+    limit: int = Query(5),
 ):
     """
     Full RAG Pipeline Endpoint
@@ -166,7 +168,8 @@ async def query_rag(
             limit=limit,
             hybrid_retrieval_enabled=hybrid_retrieval_enabled,
             query_expansion_enabled=query_expansion_enabled,
-            expansion_strategy=expansion_strategy
+            expansion_strategy=expansion_strategy,
+            debug=True,
         )
     except HTTPException:
         raise
